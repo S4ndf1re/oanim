@@ -5,7 +5,7 @@ This is a hobby project. This means this will never be ready for any serious wor
 
 ## Goals:
 - Having fun. This is inspired by tsodings recreational programming sessions and `panim`, though everything was created and thought of by me (except the plugin system, i just liked the idea that tsoding introduced).
-- Learning Odin. Normally, I really like Rust. However this time, I wanted to try something new. Writing a minimal c compiler was another option, however i really had no fun while writing the recursive descent parser (I know, I could have used some parser generator, but for some reason i wanted to experience the full thing), hence I switched to writing OAnim
+- Learning Odin. Normally, I mostly use Rust for hobby and university projects. However this time, I wanted to try something new. Writing a minimal c compiler was another option, however i really had no fun while writing the recursive descent parser (I know, I could have used some parser generator, but for some reason i wanted to experience the full thing), hence I switched to writing OAnim
 
 ## Current state:
 I mean, see for yourself. Literally nothing works :D. Except drawing and filling beziér curves and rectangles. A simple Keyframe system is implemented as well. A single Plugin is loaded. This is simply a test plugin, and I plan to add more plugins, once the default library is loaded.
