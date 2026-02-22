@@ -1,0 +1,4 @@
+# Shared libraries
+*.dylib
+*.dll
+*.so
