@@ -1,6 +1,7 @@
 package util
 
 import "core:math/linalg"
+import "triangulation"
 import rl "vendor:raylib"
 import "vendor:raylib/rlgl"
 
@@ -11,7 +12,7 @@ draw_line_in_gl_context :: proc(start, end: Vector2, thickness: f32) {
 
 	if (length > 0 && thickness > 0) {
 		factor := thickness / (2.0 * length)
-		norm := normal(diff) * factor
+		norm := triangulation.normal(diff) * factor
 
 		rlgl.Vertex2f(start.x - norm.x, start.y - norm.y)
 		rlgl.Vertex2f(start.x + norm.x, start.y + norm.y)
@@ -141,18 +142,18 @@ fill_curves :: proc(
 			}
 		}
 
-		hull := convex_hull(points[:])
-		defer delete(hull)
+		// hull := convex_hull(points[:])
+		// defer delete(hull)
 
-		triangles, ok := to_triangle_fan_indices(hull)
+		triangles, ok := triangulation.triangulate(points[:])
 		if ok {
 			defer delete(triangles)
 
 			rlgl.Color4ub(fill_color.x, fill_color.y, fill_color.z, fill_color.w)
 			for triangle in triangles {
-				v1 := hull[triangle[0]]
-				v2 := hull[triangle[1]]
-				v3 := hull[triangle[2]]
+				v1 := points[triangle[0]]
+				v2 := points[triangle[1]]
+				v3 := points[triangle[2]]
 				rlgl.Vertex2f(v1.x, v1.y)
 				rlgl.Vertex2f(v2.x, v2.y)
 				rlgl.Vertex2f(v3.x, v3.y)

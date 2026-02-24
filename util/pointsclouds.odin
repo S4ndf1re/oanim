@@ -1,48 +1,9 @@
 package util
 
-import "core:math"
-import "core:math/linalg"
 import "core:mem"
 import "core:slice"
+import "triangulation"
 
-point_on_line_t :: proc(line_start, line_end, point: Vector2) -> f32 {
-	r := line_end - line_start
-	s1 := point.x
-	s2 := point.y
-
-	r1 := r.x
-	r2 := r.y
-
-	x1_1 := line_start.x
-	x1_2 := line_start.y
-
-	t := (1.0 - r1 * s1 + r1 * x1_1 - r2 * s2 + r2 * x1_2) / (-r1 * r1 - r2 * r2)
-	return t
-}
-
-cosine :: proc(a, b: Vector2) -> f32 {
-	return linalg.dot(a, b) / (linalg.length(a) * linalg.length(b))
-}
-
-normal :: proc(v: Vector2) -> Vector2 {
-	result := v.yx
-	result.x *= -1
-	return result
-}
-
-is_right_turn :: proc(p, test, q: Vector2) -> bool {
-	direction_line := q - p
-	line_normal := normal(direction_line)
-
-	t_min_dist := math.clamp(point_on_line_t(p, q, test), 0.0, 1.0)
-	p_min_dist := p * (1.0 - t_min_dist) + q * t_min_dist
-
-	directional_test := test - p_min_dist
-	dist := linalg.length(directional_test)
-	cos := cosine(line_normal, directional_test)
-
-	return cos >= 0.0 || dist < 0.000001
-}
 
 // implement simple graham scan algorithm
 // Returns the CW winded convex hull for points
@@ -79,7 +40,7 @@ convex_hull :: proc(
 	for i := 2; i < len(ps); i += 1 {
 		vert := ps[i]
 		for len(upper_hull) >= 2 &&
-		    !is_right_turn(
+		    !triangulation.is_right_turn(
 				    upper_hull[len(upper_hull) - 2],
 				    upper_hull[len(upper_hull) - 1],
 				    vert,
@@ -93,7 +54,7 @@ convex_hull :: proc(
 	for i := len(ps) - 3; i >= 0; i -= 1 {
 		vert := ps[i]
 		for len(lower_hull) >= 2 &&
-		    !is_right_turn(
+		    !triangulation.is_right_turn(
 				    lower_hull[len(lower_hull) - 2],
 				    lower_hull[len(lower_hull) - 1],
 				    vert,

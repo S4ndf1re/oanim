@@ -2,3 +2,7 @@
 *.dylib
 *.dll
 *.so
+
+debug_build
+debug_build.dSYM/
+oanim
