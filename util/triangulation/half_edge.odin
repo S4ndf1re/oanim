@@ -59,10 +59,11 @@ he_new_empty :: proc(allocator: runtime.Allocator = context.allocator) -> HeCont
 	}
 }
 
-he_init_from_cw_ring :: proc(
+he_init_from_polygon :: proc(
 	he: ^HeContainer,
 	outline: Polygon,
-	temp_alloc: runtime.Allocator = context.temp_allocator,
+	cw: bool = true,
+	temp_allocator: runtime.Allocator = context.temp_allocator,
 ) -> bool {
 	// in order to create a face, you need at least 3 verticies
 	if len(outline) <= 2 {
@@ -74,11 +75,19 @@ he_init_from_cw_ring :: proc(
 	first_node.position = outline[0]
 	first_node.original_idx = 0
 
-	created_edges := make([dynamic]^HeEdge, 0, len(outline), temp_alloc)
+	created_edges := make([dynamic]^HeEdge, 0, len(outline), temp_allocator)
 	defer delete(created_edges)
 
 	last_node := first_node
-	for i in 1 ..< len(outline) {
+	start := 1
+	step := 1
+	cond := proc(i: int, l: int) -> bool {return i < l}
+	if !cw {
+		start = len(outline) - 1
+		step = -1
+		cond = proc(i: int, l: int) -> bool {return i >= 1}
+	}
+	for i := start; cond(i, len(outline)); i += step {
 		current_node, _ := he_empty_push_node(he)
 		current_node.position = outline[i]
 		current_node.original_idx = i
@@ -100,7 +109,7 @@ he_init_from_cw_ring :: proc(
 	// Fill twin, next and prev finally
 	append(&created_edges, edge)
 
-	created_twin_edges := make([dynamic]^HeEdge, 0, len(created_edges), temp_alloc)
+	created_twin_edges := make([dynamic]^HeEdge, 0, len(created_edges), temp_allocator)
 	defer delete(created_twin_edges)
 
 	// connect next and previous of inner circle and create outer twin edges
@@ -207,8 +216,6 @@ he_split_face_by_nodes :: proc(he: ^HeContainer, start: ^HeNode, end: ^HeNode) {
 	if !ok {
 		return
 	}
-	fmt.printfln("Common Face:")
-	he_print_face(common_face, 10)
 
 	new_edge, _ := he_empty_push_edge(he)
 	new_twin, _ := he_empty_push_edge(he)

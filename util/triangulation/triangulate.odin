@@ -175,8 +175,7 @@ triangulate :: proc(
 ) {
 	he := he_new_empty(allocator)
 	// everything is cw until here
-	slice.reverse(poly)
-	if !he_init_from_cw_ring(&he, poly, temp_allocator) {
+	if !he_init_from_polygon(&he, poly, cw = false, temp_allocator = temp_allocator) {
 		return nil, false
 	}
 	defer he_destroy(&he)
@@ -218,90 +217,77 @@ triangulate :: proc(
 		}
 	}
 
+	edges := make([]^HeEdge, len(nodes))
+	defer delete(edges)
+	for n, i in nodes {
+		edges[i] = n.edge
+	}
+
 	tree := avl.Tree(TreeKey){}
 	avl.init(&tree, tree_cmp_fn)
 	defer avl.destroy(&tree)
 	current_y: f32 = 0.0
 
-	// Use original indizes to actually correclty identify ej, ei and ei-1
-	// original_edges := make([]^HeEdge, len(nodes), temp_allocator)
-	// defer delete(original_edges, temp_allocator)
-	// for n in nodes {
-	// 	original_edges[n.original_idx] = n.edge
-	// }
-
-	for vi in nodes {
+	for e in edges {
+		vi := e.origin
 		i := vi.original_idx
 		current_y = vi.position.y
 
 		if classes[i] == .Start {
-			helper[vi.edge] = vi
-			avl.find_or_insert(&tree, TreeKey{edge = vi.edge, current_y = &current_y})
+			helper[e] = vi
+			avl.find_or_insert(&tree, TreeKey{edge = e, current_y = &current_y})
 		} else if classes[i] == .End {
-			h := helper[vi.edge.prev]
+			h := helper[e.prev]
 			if classes[h.original_idx] == .Merge {
-				// This might change nodes
-				fmt.printf("End: V_i(%d) -> h(%d)\n", vi.original_idx, h.original_idx)
 				he_split_face_by_nodes(&he, vi, h)
 			}
 
-			avl.remove(&tree, TreeKey{edge = vi.edge.prev, current_y = &current_y})
+			avl.remove(&tree, TreeKey{edge = e.prev, current_y = &current_y})
 		} else if classes[i] == .Split {
 			ej, ok := find_left_of(&tree, vi, current_y)
 
 			if ok {
 				h := helper[ej]
-				fmt.printf("Split: V_i(%d) -> h(%d)\n", vi.original_idx, h.original_idx)
-				he_print(&he)
 				he_split_face_by_nodes(&he, vi, h)
-				fmt.printf("after:\n")
-				he_print(&he)
 				helper[ej] = vi
 			}
 
-			avl.find_or_insert(&tree, TreeKey{edge = vi.edge, current_y = &current_y})
-			helper[vi.edge] = vi
+			avl.find_or_insert(&tree, TreeKey{edge = e, current_y = &current_y})
+			helper[e] = vi
 		} else if classes[i] == .Merge {
-			h := helper[vi.edge.prev]
+			h := helper[e.prev]
 			if classes[h.original_idx] == .Merge {
-				fmt.printf("Merge1: V_i(%d) -> h(%d)\n", vi.original_idx, h.original_idx)
 				he_split_face_by_nodes(&he, vi, h)
 			}
 
-			avl.remove(&tree, TreeKey{edge = vi.edge, current_y = &current_y})
+			avl.remove(&tree, TreeKey{edge = e, current_y = &current_y})
 
 			ej, ok := find_left_of(&tree, vi, current_y)
 
 			if ok {
 				h := helper[ej]
 				if classes[h.original_idx] == .Merge {
-					fmt.printf("Merge2: V_i(%d) -> h(%d)\n", vi.original_idx, h.original_idx)
 					he_split_face_by_nodes(&he, vi, h)
 				}
 				helper[ej] = vi
 			}
 		} else if classes[i] == .Regular {
-			if is_inner_right(vi.edge.prev.origin, vi) {
-				h := helper[vi.edge.prev]
+			if is_inner_right(e.prev.origin, vi) {
+				h := helper[e.prev]
 				if classes[h.original_idx] == .Merge {
-					fmt.printf("Regular1: V_i(%d) -> h(%d)\n", vi.original_idx, h.original_idx)
 					he_split_face_by_nodes(&he, vi, h)
 				}
-				avl.remove(&tree, TreeKey{edge = vi.edge.prev, current_y = &current_y})
+				avl.remove(&tree, TreeKey{edge = e.prev, current_y = &current_y})
 
-				helper[vi.edge.prev] = vi
-				avl.find_or_insert(&tree, TreeKey{edge = vi.edge, current_y = &current_y})
+				helper[e.prev] = vi
+				avl.find_or_insert(&tree, TreeKey{edge = e, current_y = &current_y})
 			} else {
 				ej, ok := find_left_of(&tree, vi, current_y)
 
 				if ok {
 					h := helper[ej]
 					if classes[h.original_idx] == .Merge {
-						fmt.printf("Regular2: V_i(%d) -> h(%d)\n", vi.original_idx, h.original_idx)
-						he_print(&he)
 						he_split_face_by_nodes(&he, vi, h)
-						fmt.printf("after:\n")
-						he_print(&he)
 					}
 					helper[ej] = vi
 				}
@@ -325,9 +311,12 @@ triangulate :: proc(
 	triangles := make([dynamic]Triangle)
 	defer delete(triangles)
 
+	fmt.printf("\nPrinting out triangesl\n")
 	faces := he_get_faces(&he)
 	defer delete(faces)
 	for face in faces {
+		he_print_face(face)
+		fmt.println()
 		edges := he_collect_edges_for_face(face)
 		assert(len(edges) == 3)
 		root := edges[0]
@@ -347,9 +336,9 @@ triangulate :: proc(
 }
 
 @(private)
-is_reflex_vertex :: proc(prev, node, next: ^HeNode) -> bool {
+is_reflex_vertex :: proc(prev, node, next: ^HeNode, is_left: bool = false) -> bool {
 	angle := inner_angle_between(prev.position, node.position, next.position)
-	return angle > math.PI
+	return is_left && angle > math.PI || angle < math.PI
 }
 
 @(private)
@@ -368,26 +357,16 @@ triangulate_y_monotone :: proc(he: ^HeContainer, face: ^HeFace) {
 		delete(nodes)
 	}
 	for edge, i in edges {
-		fmt.printf("%d->", edge.origin.original_idx)
 		idx := edge.origin.original_idx
 		nodes[i] = edge.origin
 		old_prev[idx] = edge.prev
 		old_next[idx] = edge.next
 		old_edge[idx] = edge
 	}
-	fmt.printf("\n")
 
 	slice.sort_by(nodes, proc(a, b: ^HeNode) -> bool {
 		return !less_than(a.position, b.position)
 	})
-
-
-	// In case the splits lead to problematic changes
-	for node in nodes {
-		old_prev[node.original_idx] = node.edge.prev
-		old_next[node.original_idx] = node.edge.next
-		old_edge[node.original_idx] = node.edge
-	}
 
 	stack := make([dynamic]^HeNode, context.temp_allocator)
 	defer delete(stack)
@@ -410,16 +389,11 @@ triangulate_y_monotone :: proc(he: ^HeContainer, face: ^HeFace) {
 			append(&stack, last_popped)
 			append(&stack, n)
 		} else {
-			_ = pop(&stack)
 			last_popped := pop(&stack)
-			for !is_reflex_vertex(
-				    old_prev[n.original_idx].origin,
-				    old_edge[n.original_idx].origin,
-				    old_next[n.original_idx].origin,
-			    ) {
-				he_split_face_by_nodes(he, n, last_popped)
-
-				if len(stack) > 0 {
+			for len(stack) > 0 {
+				is_left := old_next[top_s.original_idx].origin == n
+				if !is_reflex_vertex(stack[len(stack) - 1], last_popped, n, is_left) {
+					he_split_face_by_nodes(he, n, stack[len(stack) - 1])
 					last_popped = pop(&stack)
 				} else {
 					break
@@ -473,5 +447,5 @@ simple_triangulation_complex_test :: proc(t: ^testing.T) {
 	defer delete(triangles)
 
 	testing.expect(t, ok)
-	testing.expect(t, len(triangles) == 2)
+	testing.expect(t, len(triangles) == 5)
 }
