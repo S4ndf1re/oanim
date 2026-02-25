@@ -6,17 +6,18 @@ import "core:fmt"
 import "core:slice"
 
 HeContainer :: struct {
-	edges: [dynamic]HeEdge,
-	faces: [dynamic]HeFace,
-	nodes: [dynamic]HeNode,
+	edges: [dynamic]^HeEdge,
+	faces: [dynamic]^HeFace,
+	nodes: [dynamic]^HeNode,
 }
 
 HeEdge :: struct {
-	origin: ^HeNode,
-	face:   ^HeFace,
-	next:   ^HeEdge,
-	prev:   ^HeEdge,
-	twin:   ^HeEdge,
+	origin:        ^HeNode,
+	face:          ^HeFace,
+	next:          ^HeEdge,
+	prev:          ^HeEdge,
+	twin:          ^HeEdge,
+	original_prev: ^HeEdge,
 }
 
 HeNode :: struct {
@@ -27,6 +28,20 @@ HeNode :: struct {
 
 HeFace :: struct {
 	edge: ^HeEdge,
+}
+
+
+he_all_faces_at_least_3_points :: proc(he: ^HeContainer) -> (int, bool) {
+	for f, i in he.faces {
+		edges := he_collect_edges_for_face(f)
+		defer delete(edges)
+
+		if len(edges) < 3 {
+			return i, false
+		}
+	}
+
+	return 0, true
 }
 
 he_validate :: proc(he: ^HeContainer) -> (ok: bool, errors: [dynamic]string) {
@@ -40,8 +55,9 @@ he_validate :: proc(he: ^HeContainer) -> (ok: bool, errors: [dynamic]string) {
 	}
 
 	// 1. Validate all edges
-	for &edge, i in he.edges {
-		edge_ptr := &he.edges[i]
+	edges := he_get_edges(he)
+	defer delete(edges)
+	for &edge, i in edges {
 
 		// Check origin exists
 		if edge.origin == nil {
@@ -57,11 +73,16 @@ he_validate :: proc(he: ^HeContainer) -> (ok: bool, errors: [dynamic]string) {
 		// Check twin exists and is mutual
 		if edge.twin == nil {
 			add_error(&errors, &ok, fmt.aprintf("Edge %d has nil twin", i))
-		} else if edge.twin.twin != edge_ptr {
+		} else if edge.twin.twin != edge {
 			add_error(
 				&errors,
 				&ok,
-				fmt.aprintf("Edge %d twin relationship broken (twin.twin != self)", i),
+				fmt.aprintf(
+					"Edge %d twin relationship broken (twin.twin != self), %p, %p",
+					i,
+					edge.twin.twin,
+					edge.twin,
+				),
 			)
 		}
 
@@ -70,7 +91,7 @@ he_validate :: proc(he: ^HeContainer) -> (ok: bool, errors: [dynamic]string) {
 			add_error(&errors, &ok, fmt.aprintf("Edge %d has nil next", i))
 		} else {
 			// next.prev should point back to this edge
-			if edge.next.prev != edge_ptr {
+			if edge.next.prev != edge {
 				add_error(&errors, &ok, fmt.aprintf("Edge %d next.prev chain broken", i))
 			}
 
@@ -89,7 +110,7 @@ he_validate :: proc(he: ^HeContainer) -> (ok: bool, errors: [dynamic]string) {
 			add_error(&errors, &ok, fmt.aprintf("Edge %d has nil prev", i))
 		} else {
 			// prev.next should point to this edge
-			if edge.prev.next != edge_ptr {
+			if edge.prev.next != edge {
 				add_error(&errors, &ok, fmt.aprintf("Edge %d prev.next chain broken", i))
 			}
 		}
@@ -99,9 +120,9 @@ he_validate :: proc(he: ^HeContainer) -> (ok: bool, errors: [dynamic]string) {
 			current := edge.next
 			visited := make(map[^HeEdge]bool, context.temp_allocator)
 			defer delete(visited)
-			visited[edge_ptr] = true
+			visited[edge] = true
 
-			for current != nil && current != edge_ptr {
+			for current != nil && current != edge {
 				if current in visited {
 					add_error(
 						&errors,
@@ -122,15 +143,16 @@ he_validate :: proc(he: ^HeContainer) -> (ok: bool, errors: [dynamic]string) {
 				current = current.next
 			}
 
-			if current != edge_ptr {
+			if current != edge {
 				add_error(&errors, &ok, fmt.aprintf("Edge %d face cycle does not close", i))
 			}
 		}
 	}
 
 	// 2. Validate all nodes
-	for &node, i in he.nodes {
-		node_ptr := &he.nodes[i]
+	nodes := he_get_nodes(he)
+	defer delete(nodes)
+	for &node, i in nodes {
 
 		// Check edge exists
 		if node.edge == nil {
@@ -139,7 +161,7 @@ he_validate :: proc(he: ^HeContainer) -> (ok: bool, errors: [dynamic]string) {
 		}
 
 		// Check node.edge actually originates from this node
-		if node.edge.origin != node_ptr {
+		if node.edge.origin != node {
 			add_error(
 				&errors,
 				&ok,
@@ -154,7 +176,7 @@ he_validate :: proc(he: ^HeContainer) -> (ok: bool, errors: [dynamic]string) {
 		visited[current] = true
 
 		for {
-			if current.origin != node_ptr {
+			if current.origin != node {
 				add_error(
 					&errors,
 					&ok,
@@ -189,8 +211,9 @@ he_validate :: proc(he: ^HeContainer) -> (ok: bool, errors: [dynamic]string) {
 	}
 
 	// 3. Validate all faces
-	for &face, i in he.faces {
-		face_ptr := &he.faces[i]
+	faces := he_get_faces(he)
+	defer delete(faces)
+	for &face, i in faces {
 
 		// Check inner edge exists
 		if face.edge == nil {
@@ -199,7 +222,7 @@ he_validate :: proc(he: ^HeContainer) -> (ok: bool, errors: [dynamic]string) {
 		}
 
 		// Check face.inner.face points back to this face
-		if face.edge.face != face_ptr {
+		if face.edge.face != face {
 			add_error(
 				&errors,
 				&ok,
@@ -215,7 +238,7 @@ he_validate :: proc(he: ^HeContainer) -> (ok: bool, errors: [dynamic]string) {
 		edge_count := 1
 
 		for {
-			if current.face != face_ptr {
+			if current.face != face {
 				add_error(
 					&errors,
 					&ok,
@@ -262,32 +285,38 @@ he_validate :: proc(he: ^HeContainer) -> (ok: bool, errors: [dynamic]string) {
 	return ok, errors
 }
 
-he_empty_push_node :: proc(he: ^HeContainer) -> (^HeNode, int) {
-	idx := len(he.nodes)
-	_ = append(&he.nodes, HeNode{})
-	node := &he.nodes[idx]
+he_empty_push_node :: proc(
+	he: ^HeContainer,
+	allocator: runtime.Allocator = context.allocator,
+) -> (
+	^HeNode,
+	int,
+) {
+	node := new(HeNode)
+	_ = append(&he.nodes, node)
+	idx := len(he.nodes) - 1
 	return node, idx
 }
 
 he_empty_push_face :: proc(he: ^HeContainer) -> (^HeFace, int) {
-	idx := len(he.faces)
-	_ = append(&he.faces, HeFace{})
-	face := &he.faces[idx]
+	face := new(HeFace)
+	_ = append(&he.faces, face)
+	idx := len(he.faces) - 1
 	return face, idx
 }
 
 he_empty_push_edge :: proc(he: ^HeContainer) -> (^HeEdge, int) {
-	idx := len(he.edges)
-	_ = append(&he.edges, HeEdge{})
-	edge := &he.edges[idx]
+	edge := new(HeEdge)
+	_ = append(&he.edges, edge)
+	idx := len(he.edges) - 1
 	return edge, idx
 }
 
 he_new_empty :: proc(allocator: runtime.Allocator = context.allocator) -> HeContainer {
 	return HeContainer {
-		edges = make([dynamic]HeEdge, allocator),
-		faces = make([dynamic]HeFace, allocator),
-		nodes = make([dynamic]HeNode, allocator),
+		edges = make([dynamic]^HeEdge, allocator),
+		faces = make([dynamic]^HeFace, allocator),
+		nodes = make([dynamic]^HeNode, allocator),
 	}
 }
 
@@ -352,6 +381,7 @@ he_init_from_polygon :: proc(
 
 		a.next = b
 		b.prev = a
+		b.original_prev = a
 
 		twin_edge, _ := he_empty_push_edge(he)
 		twin_edge.origin = b.origin
@@ -371,12 +401,13 @@ he_init_from_polygon :: proc(
 
 		a.next = b
 		b.prev = a
+		b.original_prev = a
 	}
 
 	return true
 }
 
-he_query_all_outgoing_edges :: proc(node: ^HeNode) -> []^HeEdge {
+he_query_all_outgoing_edges :: proc(node: ^HeNode, debug: bool = false) -> []^HeEdge {
 	nodes := make([dynamic]^HeEdge, context.temp_allocator)
 	defer delete(nodes)
 
@@ -389,6 +420,11 @@ he_query_all_outgoing_edges :: proc(node: ^HeNode) -> []^HeEdge {
 			break
 		}
 
+		if debug {
+			fmt.println("Current Edge: ", current_edge)
+			fmt.println("Current Edge.twin: ", current_edge.twin)
+		}
+
 		current_edge = current_edge.twin.next
 		if current_edge == start_edge {
 			break
@@ -399,8 +435,15 @@ he_query_all_outgoing_edges :: proc(node: ^HeNode) -> []^HeEdge {
 	return slice.clone(nodes[:])
 }
 
-he_query_outgoing_edge_for_face :: proc(node: ^HeNode, face: ^HeFace) -> (^HeEdge, bool) {
-	outgoing_edges := he_query_all_outgoing_edges(node)
+he_query_outgoing_edge_for_face :: proc(
+	node: ^HeNode,
+	face: ^HeFace,
+	debug: bool = false,
+) -> (
+	^HeEdge,
+	bool,
+) {
+	outgoing_edges := he_query_all_outgoing_edges(node, debug)
 	defer delete(outgoing_edges)
 
 	for edge in outgoing_edges {
@@ -444,28 +487,56 @@ he_match_face_for_node :: proc(a, b: ^HeNode) -> (^HeFace, bool) {
 	return nil, false
 }
 
-he_split_face_by_nodes :: proc(he: ^HeContainer, start: ^HeNode, end: ^HeNode) {
+he_split_face_by_nodes :: proc(
+	he: ^HeContainer,
+	start: ^HeNode,
+	end: ^HeNode,
+	debug: bool = false,
+) {
 	common_face, ok := he_match_face_for_node(start, end)
 	if !ok {
+		return
+	}
+	if debug {
+		fmt.println("Common Face:", common_face)
+	}
+
+
+	// Get previous edges
+	end_edge, end_found := he_query_outgoing_edge_for_face(end, common_face, debug)
+	if !end_found {return}
+	end_prev := end_edge.prev
+	if debug {
+		fmt.println("End Edge:", end_edge)
+		fmt.println("End.prev Edge:", end_prev)
+	}
+
+	start_edge, start_found := he_query_outgoing_edge_for_face(start, common_face, debug)
+	if !start_found {return}
+	start_prev := start_edge.prev
+	if debug {
+		fmt.println("Start Edge:", start_edge)
+		fmt.println("Start.prev Edge:", start_prev)
+	}
+
+	if start_edge.next == end_edge ||
+	   start_edge.prev == end_edge ||
+	   end_edge.next == start_edge ||
+	   end_edge.prev == start_edge {
 		return
 	}
 
 	new_edge, _ := he_empty_push_edge(he)
 	new_twin, _ := he_empty_push_edge(he)
+	if debug {
+		fmt.println("new_edge:", new_edge)
+		fmt.println("new_twin:", new_twin)
+	}
 
 	new_edge.twin = new_twin
 	new_twin.twin = new_edge
 	new_edge.origin = start
 	new_twin.origin = end
-
-	// Get previous edges
-	end_edge, end_found := he_query_outgoing_edge_for_face(end, common_face)
-	if !end_found {return}
-	end_prev := end_edge.prev
-
-	start_edge, start_found := he_query_outgoing_edge_for_face(start, common_face)
-	if !start_found {return}
-	start_prev := start_edge.prev
 
 	start.edge = new_edge
 	end.edge = new_twin
@@ -507,28 +578,16 @@ he_split_face_by_nodes :: proc(he: ^HeContainer, start: ^HeNode, end: ^HeNode) {
 	}
 }
 
-he_get_nodes :: proc(
-	he: ^HeContainer,
-	allocator: runtime.Allocator = context.allocator,
-) -> []^HeNode {
-	nodes_len := len(he.nodes)
-	nodes := make([]^HeNode, nodes_len)
-	for i in 0 ..< nodes_len {
-		nodes[i] = &he.nodes[i]
-	}
-	return nodes
+he_get_nodes :: proc(he: ^HeContainer) -> []^HeNode {
+	return slice.clone(he.nodes[:])
 }
 
-he_get_faces :: proc(
-	he: ^HeContainer,
-	allocator: runtime.Allocator = context.allocator,
-) -> []^HeFace {
-	faces_len := len(he.faces)
-	faces := make([]^HeFace, faces_len, allocator)
-	for i in 0 ..< faces_len {
-		faces[i] = &he.faces[i]
-	}
-	return faces
+he_get_faces :: proc(he: ^HeContainer) -> []^HeFace {
+	return slice.clone(he.faces[:])
+}
+
+he_get_edges :: proc(he: ^HeContainer) -> []^HeEdge {
+	return slice.clone(he.edges[:])
 }
 
 he_collect_edges_for_face :: proc(face: ^HeFace) -> []^HeEdge {
@@ -574,6 +633,15 @@ he_print :: proc(he: ^HeContainer) {
 }
 
 he_destroy :: proc(he: ^HeContainer) {
+	for e in he.edges {
+		free(e)
+	}
+	for f in he.faces {
+		free(f)
+	}
+	for n in he.nodes {
+		free(n)
+	}
 	delete(he.edges)
 	delete(he.faces)
 	delete(he.nodes)

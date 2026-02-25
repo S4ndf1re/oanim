@@ -1,5 +1,6 @@
 package util
 
+import "core:fmt"
 import "core:math/linalg"
 import "triangulation"
 import rl "vendor:raylib"
@@ -144,6 +145,9 @@ fill_curves :: proc(
 
 		// hull := convex_hull(points[:])
 		// defer delete(hull)
+
+		compressed := triangulation.compress_polygon(points[:])
+		defer delete(compressed)
 
 		triangles, ok := triangulation.triangulate(points[:])
 		if ok {

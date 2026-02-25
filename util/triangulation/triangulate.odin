@@ -5,7 +5,6 @@ import "core:container/avl"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
-import "core:mem"
 import "core:slice"
 import "core:testing"
 
@@ -71,6 +70,16 @@ normal :: proc(v: Vector2) -> Vector2 {
 	return result
 }
 
+// Compute the distance from the line between p and q to test
+distance_from_line :: proc(p, test, q: Vector2) -> f32 {
+	t := point_on_line_t(p, q, test)
+	t_min_dist := math.clamp(t, 0.0, 1.0)
+	p_min_dist := p * (1.0 - t_min_dist) + q * t_min_dist
+	directional_test := test - p_min_dist
+	dist := linalg.length(directional_test)
+	return dist
+}
+
 is_right_turn :: proc(p, test, q: Vector2) -> bool {
 	direction_line := q - p
 	line_normal := normal(direction_line)
@@ -80,23 +89,22 @@ is_right_turn :: proc(p, test, q: Vector2) -> bool {
 
 	directional_test := test - p_min_dist
 	dist := linalg.length(directional_test)
+
 	cos := cosine(line_normal, directional_test)
 
 	return cos >= 0.0 || dist < 0.000001
 }
 
 point_on_line_t :: proc(line_start, line_end, point: Vector2) -> f32 {
-	r := line_end - line_start
-	s1 := point.x
-	s2 := point.y
+	sp := point - line_start
+	se := line_end - line_start
 
-	r1 := r.x
-	r2 := r.y
+	se_len := linalg.length2(se)
 
-	x1_1 := line_start.x
-	x1_2 := line_start.y
+	dot_prod := linalg.dot(sp, se)
 
-	t := (1.0 - r1 * s1 + r1 * x1_1 - r2 * s2 + r2 * x1_2) / (-r1 * r1 - r2 * r2)
+	t := dot_prod / se_len
+
 	return t
 }
 
@@ -179,6 +187,68 @@ find_left_of :: proc(
 	return nil, false
 }
 
+is_clockwise :: proc(poly: Polygon) -> bool {
+	sum: f32 = 0.0
+
+	poly_len := len(poly)
+	for i in 0 ..< poly_len {
+		v1 := poly[i]
+		v2 := poly[(i + 1) % poly_len]
+
+		sum += (v2.x - v1.x) * (v2.y + v1.y)
+	}
+
+	return sum >= 0
+}
+
+ensure_cw :: proc(poly: Polygon) {
+	if is_clockwise(poly) {
+		return
+	}
+
+	slice.reverse(poly)
+}
+
+// Compress a polygon by first removing all linear segments, possibly only keeping start and end.
+// Finally, remove all points that are to close to each other
+compress_polygon :: proc(
+	polygon: Polygon,
+	dist_from_line: f32 = 0.001,
+	dist_to_point: f32 = 0.001,
+) -> Polygon {
+	if len(polygon) < 3 {
+		return slice.clone(polygon)
+	}
+
+	new_poly := make([dynamic]Vector2, context.temp_allocator)
+	defer delete(new_poly)
+	append(&new_poly, polygon[0])
+	append(&new_poly, polygon[1])
+
+	for i in 2 ..< len(polygon) {
+		current := polygon[i]
+		for len(new_poly) >= 2 {
+			if linalg.length(new_poly[len(new_poly) - 1] - current) < dist_to_point {
+				pop(&new_poly)
+			} else if distance_from_line(
+				   new_poly[len(new_poly) - 2],
+				   new_poly[len(new_poly) - 1],
+				   current,
+			   ) <
+			   dist_from_line {
+				pop(&new_poly)
+			} else {
+				break
+			}
+		}
+		append(&new_poly, current)
+	}
+
+	return slice.clone(new_poly[:])
+}
+
+// Triangulate a polygon. It is expected that the polygon is not a horizontal line and has at least 3 nodes that are a minimum distance away
+// To assert thsi, use `compress_polygon` before running the triangulation
 triangulate :: proc(
 	poly: Polygon,
 	allocator: runtime.Allocator = context.allocator,
@@ -187,19 +257,23 @@ triangulate :: proc(
 	[]Triangle,
 	bool,
 ) {
+	if len(poly) < 3 {
+		return nil, false
+	}
 	he := he_new_empty(allocator)
 	// everything is cw until here
-	if !he_init_from_polygon(&he, poly, cw = false, temp_allocator = temp_allocator) {
+	if !he_init_from_polygon(
+		&he,
+		poly,
+		cw = !is_clockwise(poly), // Invert, because we want to flip the winding order so that is always ccw
+		temp_allocator = temp_allocator,
+	) {
 		return nil, false
 	}
 	defer he_destroy(&he)
-	ok, errs := he_validate(&he)
-	if !ok {
-		fmt.printf("%v\n", errs)
-	}
 
-	nodes := he_get_nodes(&he, allocator)
-	defer delete(nodes, allocator)
+	nodes := he_get_nodes(&he)
+	defer delete(nodes)
 	slice.sort_by(
 		nodes,
 		proc(a, b: ^HeNode) -> bool {
@@ -216,6 +290,8 @@ triangulate :: proc(
 	defer delete(helper)
 
 	// First, classify all nodes
+	has_start := false
+	has_end := false
 	for node in nodes {
 		u := node.edge.prev.origin.position
 		v := node.position
@@ -224,15 +300,22 @@ triangulate :: proc(
 		angle := inner_angle_between(u, v, w)
 		if less_than(u, v) && less_than(w, v) && angle < math.PI {
 			classes[i] = .Start
+			has_start = true
 		} else if less_than(u, v) && less_than(w, v) && angle > math.PI {
 			classes[i] = .Split
 		} else if less_than(v, u) && less_than(v, w) && angle < math.PI {
 			classes[i] = .End
+			has_end = true
 		} else if less_than(v, u) && less_than(v, w) && angle > math.PI {
 			classes[i] = .Merge
 		} else {
 			classes[i] = .Regular
 		}
+	}
+
+	if !has_end || !has_start {
+		// Likely is a line
+		return nil, false
 	}
 
 	edges := make([]^HeEdge, len(nodes))
@@ -255,12 +338,12 @@ triangulate :: proc(
 			helper[e] = vi
 			avl.find_or_insert(&tree, TreeKey{edge = e, current_y = &current_y})
 		} else if classes[i] == .End {
-			h := helper[e.prev]
+			h := helper[e.original_prev]
 			if classes[h.original_idx] == .Merge {
 				he_split_face_by_nodes(&he, vi, h)
 			}
 
-			avl.remove(&tree, TreeKey{edge = e.prev, current_y = &current_y})
+			avl.remove(&tree, TreeKey{edge = e.original_prev, current_y = &current_y})
 		} else if classes[i] == .Split {
 			ej, ok := find_left_of(&tree, vi, current_y)
 
@@ -273,12 +356,12 @@ triangulate :: proc(
 			avl.find_or_insert(&tree, TreeKey{edge = e, current_y = &current_y})
 			helper[e] = vi
 		} else if classes[i] == .Merge {
-			h := helper[e.prev]
+			h := helper[e.original_prev]
 			if classes[h.original_idx] == .Merge {
 				he_split_face_by_nodes(&he, vi, h)
 			}
 
-			avl.remove(&tree, TreeKey{edge = e, current_y = &current_y})
+			avl.remove(&tree, TreeKey{edge = e.original_prev, current_y = &current_y})
 
 			ej, ok := find_left_of(&tree, vi, current_y)
 
@@ -290,14 +373,14 @@ triangulate :: proc(
 				helper[ej] = vi
 			}
 		} else if classes[i] == .Regular {
-			if is_inner_right(e.prev.origin, vi) {
-				h := helper[e.prev]
+			if is_inner_right(e.original_prev.origin, vi) {
+				h := helper[e.original_prev]
 				if classes[h.original_idx] == .Merge {
 					he_split_face_by_nodes(&he, vi, h)
 				}
-				avl.remove(&tree, TreeKey{edge = e.prev, current_y = &current_y})
+				avl.remove(&tree, TreeKey{edge = e.original_prev, current_y = &current_y})
 
-				helper[e.prev] = vi
+				helper[e] = vi
 				avl.find_or_insert(&tree, TreeKey{edge = e, current_y = &current_y})
 			} else {
 				ej, ok := find_left_of(&tree, vi, current_y)
@@ -313,8 +396,6 @@ triangulate :: proc(
 		}
 	}
 
-	assert(avl.len(&tree) == 0)
-
 	// Clone here, so that later changes will not affect anything
 	{
 		faces := he_get_faces(&he)
@@ -323,7 +404,6 @@ triangulate :: proc(
 			triangulate_y_monotone(&he, face)
 		}
 	}
-
 
 	// Collect triangles
 	triangles := make([dynamic]Triangle)
@@ -336,14 +416,17 @@ triangulate :: proc(
 		defer delete(edges)
 		assert(len(edges) == 3)
 		root := edges[0]
+
+		triangle := Triangle {
+			root.next.next.origin.original_idx,
+			root.next.origin.original_idx,
+			root.origin.original_idx,
+		}
+
 		append(
 			&triangles,
 			// Make CW triangle
-			Triangle {
-				root.next.next.origin.original_idx,
-				root.next.origin.original_idx,
-				root.origin.original_idx,
-			},
+			triangle,
 		)
 	}
 
@@ -383,7 +466,7 @@ triangulate_y_monotone :: proc(he: ^HeContainer, face: ^HeFace) {
 		return !less_than(a.position, b.position)
 	})
 
-	stack := make([dynamic]^HeNode, context.temp_allocator)
+	stack := make([dynamic]^HeNode, 0, len(nodes), context.temp_allocator)
 	defer delete(stack)
 
 	append(&stack, nodes[0])
@@ -396,12 +479,16 @@ triangulate_y_monotone :: proc(he: ^HeContainer, face: ^HeFace) {
 		   !(old_prev[top_s.original_idx].origin == n) {
 			// are on different sides of monoton
 
-			last_popped: ^HeNode = nil
-			for len(stack) > 1 {
-				last_popped = pop(&stack)
-				he_split_face_by_nodes(he, n, last_popped)
+			// Empty stack
+			for len(stack) > 0 {
+				popped := pop(&stack)
+				// connect all except the last one
+				if len(stack) > 0 {
+					he_split_face_by_nodes(he, n, popped)
+				}
 			}
-			append(&stack, last_popped)
+
+			append(&stack, top_s)
 			append(&stack, n)
 		} else {
 			last_popped := pop(&stack)
@@ -438,6 +525,28 @@ simple_triangulation_test :: proc(t: ^testing.T) {
 }
 
 @(test)
+simple_triangulation_empty_test :: proc(t: ^testing.T) {
+	triangle := [?]Vector2{}
+	triangles, ok := triangulate(triangle[:])
+	defer delete(triangles)
+
+	testing.expect(t, !ok)
+	testing.expect(t, triangles == nil)
+}
+
+@(test)
+simple_triangulation_on_line_test :: proc(t: ^testing.T) {
+	triangle := [?]Vector2{{0.0, 0.0}, {1.0, 0.0}, {2.0, 0.0}, {3.0, 0.0}}
+	compressed := compress_polygon(triangle[:])
+	defer delete(compressed)
+
+	triangles, ok := triangulate(compressed)
+	defer delete(triangles)
+
+	testing.expect(t, !ok)
+}
+
+@(test)
 simple_triangulation_quad_test :: proc(t: ^testing.T) {
 	triangle := [?]Vector2{{0.0, 0.0}, {1.0, 0}, {0.0, -1.0}, {-1.0, 0.0}}
 	triangles, ok := triangulate(triangle[:])
@@ -463,4 +572,120 @@ simple_triangulation_complex_test :: proc(t: ^testing.T) {
 
 	testing.expect(t, ok)
 	testing.expect(t, len(triangles) == 5)
+}
+
+@(test)
+simple_triangulation_extracted_test :: proc(t: ^testing.T) {
+	triangle := [?]Vector2 {
+		{100.0, 100.0},
+		{102.019997, 103.960007},
+		{104.08, 107.839996},
+		{105.973778, 111.273544},
+	}
+	triangles, ok := triangulate(triangle[:])
+	defer delete(triangles)
+
+	testing.expect(t, ok)
+	fmt.println(triangles)
+}
+
+
+@(test)
+simple_triangulation_extracted_long_test :: proc(t: ^testing.T) {
+	triangle := [?]Vector2 {
+		{-50.0, -50.0},
+		{-49.0, -50.0},
+		{-48.0, -50.0},
+		{-47.0, -50.0},
+		{-46.0, -50.0},
+		{-45.0, -50.0},
+		{-44.0, -50.0},
+		{-43.0, -50.0},
+		{-42.0, -50.0},
+		{-41.0, -50.0},
+		{-40.0, -50.0},
+		{-39.0, -50.0},
+		{-38.0, -50.0},
+		{-37.0, -50.0},
+		{-36.0, -50.0},
+		{-35.0, -50.0},
+		{-34.0, -50.0},
+		{-33.0, -50.0},
+		{-32.0, -50.0},
+		{-31.0, -50.0},
+		{-29.999996, -49.999996},
+		{-29.118324, -50},
+	}
+	compressed := compress_polygon(triangle[:])
+	defer delete(compressed)
+
+	triangles, ok := triangulate(compressed)
+	defer delete(triangles)
+
+	testing.expect(t, !ok)
+}
+
+@(test)
+simple_triangulation_extracted_long2_test :: proc(t: ^testing.T) {
+	triangle := [?]Vector2 {
+		{100, 100},
+		{102.019997, 103.960007},
+		{104.08, 107.839996},
+		{106.18, 111.639999},
+		{108.31999, 115.36},
+		{110.5, 119},
+		{112.72, 122.559998},
+		{114.98, 126.04},
+		{117.279999, 129.44},
+		{119.619995, 132.76001},
+		{122, 136},
+		{124.419998, 139.16},
+		{126.87999, 142.23999},
+		{129.37999, 145.23999},
+		{131.919998, 148.16},
+		{134.5, 151},
+		{137.12, 153.76001},
+		{139.779999, 156.44},
+		{142.48001, 159.03999},
+		{145.22, 161.56},
+		{148, 164},
+		{150.82, 166.36},
+		{153.680008, 168.639999},
+		{156.58002, 170.84001},
+		{159.52002, 172.96002},
+		{162.50002, 175},
+		{165.52, 176.96},
+		{168.58, 178.84001},
+		{171.67999, 180.64001},
+		{174.82, 182.36002},
+		{178, 184},
+		{181.22, 185.56},
+		{184.48, 187.040009},
+		{187.779999, 188.440018},
+		{191.12, 189.76001},
+		{194.5, 191},
+		{197.91998, 192.16},
+		{201.37997, 193.24},
+		{204.87997, 194.23999},
+		{208.41998, 195.16},
+		{211.999969, 196},
+		{215.61996, 196.75999},
+		{219.279968, 197.44},
+		{222.97995, 198.03999},
+		{226.71996, 198.56},
+		{230.499969, 199},
+		{234.31995, 199.36002},
+		{238.17993, 199.64001},
+		{242.07993, 199.84001},
+		{246.019928, 199.96},
+		{249.99992, 200.00003},
+		{252.13481, 199.988678},
+	}
+	compressed := compress_polygon(triangle[:])
+	defer delete(compressed)
+
+	triangles, ok := triangulate(compressed)
+	defer delete(triangles)
+
+	testing.expect(t, ok)
 }
