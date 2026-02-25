@@ -1,19 +1,22 @@
-package util
+package lib
 
 import "core:fmt"
 import "core:math/linalg"
-import "triangulation"
+import "polygons"
 import rl "vendor:raylib"
 import "vendor:raylib/rlgl"
 
 
+// this is a near one to one copy from raylib. I wanted to make sure that this function can be called from within an rlgl.Begin() -> rlgl.End() Block.
+// The Raylib implementation start a new block
+@(private)
 draw_line_in_gl_context :: proc(start, end: Vector2, thickness: f32) {
 	diff := end - start
 	length := linalg.length(diff)
 
 	if (length > 0 && thickness > 0) {
 		factor := thickness / (2.0 * length)
-		norm := triangulation.normal(diff) * factor
+		norm := polygons.normal(diff) * factor
 
 		rlgl.Vertex2f(start.x - norm.x, start.y - norm.y)
 		rlgl.Vertex2f(start.x + norm.x, start.y + norm.y)
@@ -25,6 +28,8 @@ draw_line_in_gl_context :: proc(start, end: Vector2, thickness: f32) {
 	}
 }
 
+// Draw a simple curve with thickness, transformed by translation and rotationAngle (around z axis).
+// The curve is assumed to be a beziér curve and is drawn until `t_until`
 draw_curve :: proc(
 	curve: Segment,
 	t_until: f32,
@@ -68,6 +73,7 @@ draw_curve :: proc(
 	rlgl.End()
 }
 
+// Same as draw_curve, but fill its interior using tesselation
 fill_curve :: proc(
 	curve: Segment,
 	t_until: f32,
@@ -92,6 +98,7 @@ fill_curve :: proc(
 	)
 }
 
+// Fill multiple curves using tesselation
 fill_curves :: proc(
 	curves: []Segment,
 	t_until: []f32,
@@ -146,10 +153,10 @@ fill_curves :: proc(
 		// hull := convex_hull(points[:])
 		// defer delete(hull)
 
-		compressed := triangulation.compress_polygon(points[:])
+		compressed := polygons.compress_polygon(points[:])
 		defer delete(compressed)
 
-		triangles, err := triangulation.triangulate(compressed)
+		triangles, err := polygons.triangulate(compressed)
 		if err == nil {
 			defer delete(triangles)
 
@@ -162,8 +169,6 @@ fill_curves :: proc(
 				rlgl.Vertex2f(v2.x, v2.y)
 				rlgl.Vertex2f(v3.x, v3.y)
 			}
-		} else {
-			fmt.println("Error:", err)
 		}
 	}
 	rlgl.End()

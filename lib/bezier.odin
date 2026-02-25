@@ -1,10 +1,9 @@
-package util
+package lib
 
 Vector2 :: [2]f32
-
 Segment :: []Vector2
 
-// compute decasteljau computation
+// compute decasteljau bezier point using control `points` and a parameter `t`
 decas :: proc(points: Segment, t: f32) -> Vector2 {
 	assert(len(points) >= 1)
 	n := len(points)

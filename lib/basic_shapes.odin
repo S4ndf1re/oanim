@@ -1,19 +1,25 @@
-package util
+package lib
 
 import "core:slice"
 import rl "vendor:raylib"
 
+// A basic shape is a list of segments.
+// it can be thought of as a connected curve.
+// Each segment is mapped to a part of the input parameter t for the basic shape.
+// For example: if the basic shape has 4 segments, each segment is mapped to 1/4 of the total parameter space (normally 0->1)
 BasicShape :: struct {
 	segments:   []Segment,
 	color:      rl.Color,
 	fill_color: rl.Color,
 }
 
+// A simple rectangle as a basic shape
 Rectangle :: struct {
 	using shape: BasicShape,
 	w, h:        f32,
 }
 
+// Create a new rectangle centered aroudn the origin with width `w` and height `h`
 new_basic_rect :: proc(
 	w, h: f32,
 	color: rl.Color = rl.RED,
@@ -53,8 +59,10 @@ new_basic_rect :: proc(
 	return rect
 }
 
+// Delete a basic shape
 destroy_basic_shape :: proc(shape: ^BasicShape) {
 	for seg in shape.segments {
+		// Delete a basic shape
 		delete(seg)
 	}
 
@@ -62,6 +70,8 @@ destroy_basic_shape :: proc(shape: ^BasicShape) {
 }
 
 
+// Split the parameter `t` to the segments into `ts`.
+// Each segment timestamp `ts` is a mapping from 1/n to 0->1
 @(private)
 split_t_into_ts :: proc(shape: ^BasicShape, t: f32, ts: []f32) -> bool {
 	if len(shape.segments) != len(ts) {
@@ -91,6 +101,7 @@ split_t_into_ts :: proc(shape: ^BasicShape, t: f32, ts: []f32) -> bool {
 	return true
 }
 
+// Draw a shape using the draw curve by identifying the current parameterspace `ts`
 draw_shape_until :: proc(
 	shape: ^BasicShape,
 	t: f32,
@@ -114,6 +125,7 @@ draw_shape_until :: proc(
 	}
 }
 
+// Draw a complete shape
 draw_shape_all :: proc(shape: ^BasicShape) {
 	for s in shape.segments {
 		draw_curve(s, 1.0, 0.001, color = shape.color)
@@ -125,6 +137,7 @@ draw_shape :: proc {
 	draw_shape_until,
 }
 
+// Fill a shape. Identify the same paramters as draw_shape_until
 fill_shape_until :: proc(
 	shape: ^BasicShape,
 	t: f32,
@@ -145,6 +158,7 @@ fill_shape_until :: proc(
 	)
 }
 
+// Fill the whole shape
 fill_shape_all :: proc(
 	shape: ^BasicShape,
 	translation: Vector2 = {0.0, 0.0},

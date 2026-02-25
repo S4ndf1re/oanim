@@ -1,5 +1,8 @@
-package util
+package lib
 
+// Keyframe represents a fixed time duration that is mapped to a parameter.
+// The parameter starts at `start` and ends at `end`. The transition takes `duration` seconds.
+// The transition from start to end can be eased using the ease_fn
 Keyframe :: struct {
 	start:    f32,
 	end:      f32,
@@ -8,6 +11,7 @@ Keyframe :: struct {
 }
 
 
+// A list of multiple keyframes. Can be thought of as a player that plays a sequence of keyframes for the same parameter
 Keyframes :: struct {
 	current: int,
 	keys:    [dynamic]Keyframe,
@@ -16,11 +20,13 @@ Keyframes :: struct {
 }
 
 
+// Clear all keyframes
 clear :: proc(kfs: ^Keyframes) {
 	delete(kfs.keys)
 	kfs.keys = make([dynamic]Keyframe)
 }
 
+// Initialize a new keyframe
 init :: proc(loop: bool) -> Keyframes {
 	frames := Keyframes{}
 	frames.loop = loop
@@ -29,10 +35,12 @@ init :: proc(loop: bool) -> Keyframes {
 	return frames
 }
 
+// Push a keyframe onto the keyframe player
 push :: proc(kfs: ^Keyframes, frame: Keyframe) {
 	_ = append(&kfs.keys, frame)
 }
 
+// Delete the keyframes
 destroy :: proc(kfs: ^Keyframes) {
 	delete(kfs.keys)
 }

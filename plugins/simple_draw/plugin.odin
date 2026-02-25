@@ -1,9 +1,8 @@
 package simple_draw
 
-import "core:fmt"
 import rl "vendor:raylib"
 
-import util "../../util"
+import util "../../lib"
 
 State :: struct {
 	frames:         util.Keyframes,

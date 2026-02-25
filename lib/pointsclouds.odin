@@ -1,8 +1,8 @@
-package util
+package lib
 
 import "core:mem"
 import "core:slice"
-import "triangulation"
+import "polygons"
 
 
 // implement simple graham scan algorithm
@@ -40,7 +40,7 @@ convex_hull :: proc(
 	for i := 2; i < len(ps); i += 1 {
 		vert := ps[i]
 		for len(upper_hull) >= 2 &&
-		    !triangulation.is_right_turn(
+		    !polygons.is_right_turn(
 				    upper_hull[len(upper_hull) - 2],
 				    upper_hull[len(upper_hull) - 1],
 				    vert,
@@ -54,7 +54,7 @@ convex_hull :: proc(
 	for i := len(ps) - 3; i >= 0; i -= 1 {
 		vert := ps[i]
 		for len(lower_hull) >= 2 &&
-		    !triangulation.is_right_turn(
+		    !polygons.is_right_turn(
 				    lower_hull[len(lower_hull) - 2],
 				    lower_hull[len(lower_hull) - 1],
 				    vert,

@@ -1,4 +1,4 @@
-package triangulation
+package polygons
 
 import "base:runtime"
 import "core:container/avl"
@@ -8,10 +8,12 @@ import "core:math/linalg"
 import "core:slice"
 import "core:testing"
 
-TriangulationFailureReason :: enum {
-	LessThanThreeVertices,
-	HalfEdgeInitializationFailed,
-	NoStartOrEnd,
+TriangulationFailureReason :: union {
+	enum {
+		LessThanThreeVertices,
+		HalfEdgeInitializationFailed,
+		NoStartOrEnd,
+	},
 }
 
 @(private)
@@ -66,64 +68,6 @@ ClassifiedNode :: struct {
 	node: ^HeNode,
 }
 
-cosine :: proc(a, b: Vector2) -> f32 {
-	return linalg.dot(a, b) / (linalg.length(a) * linalg.length(b))
-}
-
-normal :: proc(v: Vector2) -> Vector2 {
-	result := v.yx
-	result.x *= -1
-	return result
-}
-
-// Compute the distance from the line between p and q to test
-distance_from_line :: proc(p, test, q: Vector2) -> f32 {
-	t := point_on_line_t(p, q, test)
-	t_min_dist := math.clamp(t, 0.0, 1.0)
-	p_min_dist := p * (1.0 - t_min_dist) + q * t_min_dist
-	directional_test := test - p_min_dist
-	dist := linalg.length(directional_test)
-	return dist
-}
-
-is_right_turn :: proc(p, test, q: Vector2) -> bool {
-	direction_line := q - p
-	line_normal := normal(direction_line)
-
-	t_min_dist := math.clamp(point_on_line_t(p, q, test), 0.0, 1.0)
-	p_min_dist := p * (1.0 - t_min_dist) + q * t_min_dist
-
-	directional_test := test - p_min_dist
-	dist := linalg.length(directional_test)
-
-	cos := cosine(line_normal, directional_test)
-
-	return cos >= 0.0 || dist < 0.000001
-}
-
-point_on_line_t :: proc(line_start, line_end, point: Vector2) -> f32 {
-	sp := point - line_start
-	se := line_end - line_start
-
-	se_len := linalg.length2(se)
-
-	dot_prod := linalg.dot(sp, se)
-
-	t := dot_prod / se_len
-
-	return t
-}
-
-@(private)
-angle_between :: proc(u, v, w: Vector2) -> f32 {
-	diff1 := u - v
-	diff2 := w - v
-
-	cos := cosine(diff1, diff2)
-
-	return math.acos(cos)
-}
-
 
 @(private)
 less_than :: proc(u, v: Vector2) -> bool {
@@ -147,20 +91,7 @@ inner_angle_between :: proc(u, v, w: Vector2) -> f32 {
 	return angle
 }
 
-print_tree :: proc(tree: ^avl.Tree(TreeKey)) {
-	iter := avl.iterator(tree, .Forward)
-
-	for {
-		val, ok := avl.iterator_next(&iter)
-		if !ok {
-			break
-		}
-
-		fmt.printf("%d", val.value.edge.origin.original_idx)
-	}
-	fmt.println()
-}
-
+// Find the edge left of target. Left means, n.x < target.x
 @(private)
 find_left_of :: proc(
 	tree: ^avl.Tree(TreeKey),
@@ -193,6 +124,7 @@ find_left_of :: proc(
 	return nil, false
 }
 
+// Test if the polygon is in CW or CCW order
 is_clockwise :: proc(poly: Polygon) -> bool {
 	sum: f32 = 0.0
 
@@ -207,6 +139,7 @@ is_clockwise :: proc(poly: Polygon) -> bool {
 	return sum >= 0
 }
 
+// Make sure, that the order of the polygon is in ccw
 ensure_cw :: proc(poly: Polygon) {
 	if is_clockwise(poly) {
 		return
@@ -215,8 +148,8 @@ ensure_cw :: proc(poly: Polygon) {
 	slice.reverse(poly)
 }
 
-// Compress a polygon by first removing all linear segments, possibly only keeping start and end.
-// Finally, remove all points that are to close to each other
+// Comporess the polygon by removing `straight lines` (defined by the dist_from_line threshold)
+// and `point to point` distance (dist_to_point threshold)
 compress_polygon :: proc(
 	polygon: Polygon,
 	dist_from_line: f32 = 0.001,
@@ -253,8 +186,27 @@ compress_polygon :: proc(
 	return slice.clone(new_poly[:])
 }
 
-// Triangulate a polygon. It is expected that the polygon is not a horizontal line and has at least 3 nodes that are a minimum distance away
-// To assert thsi, use `compress_polygon` before running the triangulation
+// Triangulate the polygon by first creating a half edge datastructure.
+// Then, Split the Polygon (one Face) into multiple y monotone faces.
+// Each Face is further split down to CW Trianges using a simple y monotone tesselation
+// The resulting trianges are returned. Each Triangle consists of the indices into the original polygon
+// ## NOTE
+// It is advised to compress the polygon first, because straight lines WILL cause problems, and because the function
+// will return indizes into the original polygon, this function WILL NOT compress the polygon itself
+//
+// ## Example
+// ```odin
+// poly := [?]Vector2{{0.0, 0.0}, {0.5, 1.0}, {1.0, 0.0}}
+// compressed := compress(poly[:])
+// defer delete(compressed)
+//
+// trianges, err := triangulate(compresses)
+// if err != nil {
+//   fmt.println(err)
+// } else {
+// 	 fmt.println(trianges)
+// }
+// ```
 triangulate :: proc(
 	poly: Polygon,
 	allocator: runtime.Allocator = context.allocator,
@@ -266,7 +218,8 @@ triangulate :: proc(
 	if len(poly) < 3 {
 		return nil, .LessThanThreeVertices
 	}
-	he := he_new_empty(allocator)
+	he := HeContainer{}
+	he_init_empty(&he, allocator)
 	// everything is cw until here
 	if !he_init_from_polygon(
 		&he,
@@ -424,7 +377,7 @@ triangulate :: proc(
 		root := edges[0]
 
 		triangle := Triangle {
-			root.next.next.origin.original_idx,
+			root.prev.origin.original_idx,
 			root.next.origin.original_idx,
 			root.origin.original_idx,
 		}
@@ -597,7 +550,7 @@ simple_triangulation_extracted_test :: proc(t: ^testing.T) {
 
 
 @(test)
-simple_triangulation_extracted_long_test :: proc(t: ^testing.T) {
+simple_triangulation_extracted_long_line_test :: proc(t: ^testing.T) {
 	triangle := [?]Vector2 {
 		{-50.0, -50.0},
 		{-49.0, -50.0},
