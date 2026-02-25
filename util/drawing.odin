@@ -149,19 +149,21 @@ fill_curves :: proc(
 		compressed := triangulation.compress_polygon(points[:])
 		defer delete(compressed)
 
-		triangles, ok := triangulation.triangulate(points[:])
-		if ok {
+		triangles, err := triangulation.triangulate(compressed)
+		if err == nil {
 			defer delete(triangles)
 
 			rlgl.Color4ub(fill_color.x, fill_color.y, fill_color.z, fill_color.w)
 			for triangle in triangles {
-				v1 := points[triangle[0]]
-				v2 := points[triangle[1]]
-				v3 := points[triangle[2]]
+				v1 := compressed[triangle[0]]
+				v2 := compressed[triangle[1]]
+				v3 := compressed[triangle[2]]
 				rlgl.Vertex2f(v1.x, v1.y)
 				rlgl.Vertex2f(v2.x, v2.y)
 				rlgl.Vertex2f(v3.x, v3.y)
 			}
+		} else {
+			fmt.println("Error:", err)
 		}
 	}
 	rlgl.End()

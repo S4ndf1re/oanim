@@ -1,5 +1,6 @@
 package simple_draw
 
+import "core:fmt"
 import rl "vendor:raylib"
 
 import util "../../util"

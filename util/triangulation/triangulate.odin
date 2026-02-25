@@ -8,6 +8,12 @@ import "core:math/linalg"
 import "core:slice"
 import "core:testing"
 
+TriangulationFailureReason :: enum {
+	LessThanThreeVertices,
+	HalfEdgeInitializationFailed,
+	NoStartOrEnd,
+}
+
 @(private)
 TreeKey :: struct {
 	edge:      ^HeEdge,
@@ -255,10 +261,10 @@ triangulate :: proc(
 	temp_allocator: runtime.Allocator = context.temp_allocator,
 ) -> (
 	[]Triangle,
-	bool,
+	TriangulationFailureReason,
 ) {
 	if len(poly) < 3 {
-		return nil, false
+		return nil, .LessThanThreeVertices
 	}
 	he := he_new_empty(allocator)
 	// everything is cw until here
@@ -268,7 +274,7 @@ triangulate :: proc(
 		cw = !is_clockwise(poly), // Invert, because we want to flip the winding order so that is always ccw
 		temp_allocator = temp_allocator,
 	) {
-		return nil, false
+		return nil, .HalfEdgeInitializationFailed
 	}
 	defer he_destroy(&he)
 
@@ -315,7 +321,7 @@ triangulate :: proc(
 
 	if !has_end || !has_start {
 		// Likely is a line
-		return nil, false
+		return nil, .NoStartOrEnd
 	}
 
 	edges := make([]^HeEdge, len(nodes))
@@ -430,7 +436,7 @@ triangulate :: proc(
 		)
 	}
 
-	return slice.clone(triangles[:]), true
+	return slice.clone(triangles[:]), nil
 }
 
 @(private)
@@ -517,20 +523,20 @@ triangulate_y_monotone :: proc(he: ^HeContainer, face: ^HeFace) {
 @(test)
 simple_triangulation_test :: proc(t: ^testing.T) {
 	triangle := [?]Vector2{{0.0, 0.0}, {0.5, -1.0}, {1.0, 0.0}}
-	triangles, ok := triangulate(triangle[:])
+	triangles, err := triangulate(triangle[:])
 	defer delete(triangles)
 
-	testing.expect(t, ok)
+	testing.expect(t, err == nil)
 	testing.expect(t, len(triangles) == 1)
 }
 
 @(test)
 simple_triangulation_empty_test :: proc(t: ^testing.T) {
 	triangle := [?]Vector2{}
-	triangles, ok := triangulate(triangle[:])
+	triangles, err := triangulate(triangle[:])
 	defer delete(triangles)
 
-	testing.expect(t, !ok)
+	testing.expect(t, err != nil)
 	testing.expect(t, triangles == nil)
 }
 
@@ -540,19 +546,19 @@ simple_triangulation_on_line_test :: proc(t: ^testing.T) {
 	compressed := compress_polygon(triangle[:])
 	defer delete(compressed)
 
-	triangles, ok := triangulate(compressed)
+	triangles, err := triangulate(compressed)
 	defer delete(triangles)
 
-	testing.expect(t, !ok)
+	testing.expect(t, err != nil)
 }
 
 @(test)
 simple_triangulation_quad_test :: proc(t: ^testing.T) {
 	triangle := [?]Vector2{{0.0, 0.0}, {1.0, 0}, {0.0, -1.0}, {-1.0, 0.0}}
-	triangles, ok := triangulate(triangle[:])
+	triangles, err := triangulate(triangle[:])
 	defer delete(triangles)
 
-	testing.expect(t, ok)
+	testing.expect(t, err == nil)
 	testing.expect(t, len(triangles) == 2)
 }
 
@@ -567,10 +573,10 @@ simple_triangulation_complex_test :: proc(t: ^testing.T) {
 		{0.5, -2.0},
 		{0.0, -3.0},
 	}
-	triangles, ok := triangulate(triangle[:])
+	triangles, err := triangulate(triangle[:])
 	defer delete(triangles)
 
-	testing.expect(t, ok)
+	testing.expect(t, err == nil)
 	testing.expect(t, len(triangles) == 5)
 }
 
@@ -582,10 +588,10 @@ simple_triangulation_extracted_test :: proc(t: ^testing.T) {
 		{104.08, 107.839996},
 		{105.973778, 111.273544},
 	}
-	triangles, ok := triangulate(triangle[:])
+	triangles, err := triangulate(triangle[:])
 	defer delete(triangles)
 
-	testing.expect(t, ok)
+	testing.expect(t, err == nil)
 	fmt.println(triangles)
 }
 
@@ -619,10 +625,10 @@ simple_triangulation_extracted_long_test :: proc(t: ^testing.T) {
 	compressed := compress_polygon(triangle[:])
 	defer delete(compressed)
 
-	triangles, ok := triangulate(compressed)
+	triangles, err := triangulate(compressed)
 	defer delete(triangles)
 
-	testing.expect(t, !ok)
+	testing.expect(t, err != nil)
 }
 
 @(test)
@@ -684,8 +690,26 @@ simple_triangulation_extracted_long2_test :: proc(t: ^testing.T) {
 	compressed := compress_polygon(triangle[:])
 	defer delete(compressed)
 
-	triangles, ok := triangulate(compressed)
+	triangles, err := triangulate(compressed)
 	defer delete(triangles)
 
-	testing.expect(t, ok)
+	testing.expect(t, err == nil)
+}
+
+@(test)
+simple_triangulation_cube_test :: proc(t: ^testing.T) {
+	triangle := [?]Vector2 {
+		{-50.0, -50.0},
+		{50.0, -50.0},
+		{50.0, 50.0},
+		{-50.0, 50.0},
+		{-50.0, -3.366661},
+	}
+	compressed := compress_polygon(triangle[:])
+	defer delete(compressed)
+
+	triangles, err := triangulate(compressed)
+	defer delete(triangles)
+
+	testing.expect(t, err == nil)
 }
