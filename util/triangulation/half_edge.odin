@@ -26,8 +26,240 @@ HeNode :: struct {
 }
 
 HeFace :: struct {
-	inner: ^HeEdge,
-	outer: ^HeEdge,
+	edge: ^HeEdge,
+}
+
+he_validate :: proc(he: ^HeContainer) -> (ok: bool, errors: [dynamic]string) {
+	errors = make([dynamic]string)
+	ok = true
+
+	// Helper to add error
+	add_error :: proc(errors: ^[dynamic]string, ok: ^bool, msg: string) {
+		append(errors, msg)
+		ok^ = false
+	}
+
+	// 1. Validate all edges
+	for &edge, i in he.edges {
+		edge_ptr := &he.edges[i]
+
+		// Check origin exists
+		if edge.origin == nil {
+			add_error(&errors, &ok, fmt.aprintf("Edge %d has nil origin", i))
+			continue
+		}
+
+		// Check face exists (can be nil for boundary edges)
+		// if edge.face == nil {
+		// 	add_error(&errors, &ok, fmt.aprintf("Edge %d has nil face", i))
+		// }
+
+		// Check twin exists and is mutual
+		if edge.twin == nil {
+			add_error(&errors, &ok, fmt.aprintf("Edge %d has nil twin", i))
+		} else if edge.twin.twin != edge_ptr {
+			add_error(
+				&errors,
+				&ok,
+				fmt.aprintf("Edge %d twin relationship broken (twin.twin != self)", i),
+			)
+		}
+
+		// Check next exists
+		if edge.next == nil {
+			add_error(&errors, &ok, fmt.aprintf("Edge %d has nil next", i))
+		} else {
+			// next.prev should point back to this edge
+			if edge.next.prev != edge_ptr {
+				add_error(&errors, &ok, fmt.aprintf("Edge %d next.prev chain broken", i))
+			}
+
+			// next.origin should be this edge's destination (twin.origin)
+			if edge.twin != nil && edge.next.origin != edge.twin.origin {
+				add_error(
+					&errors,
+					&ok,
+					fmt.aprintf("Edge %d next.origin != twin.origin (connectivity broken)", i),
+				)
+			}
+		}
+
+		// Check prev exists
+		if edge.prev == nil {
+			add_error(&errors, &ok, fmt.aprintf("Edge %d has nil prev", i))
+		} else {
+			// prev.next should point to this edge
+			if edge.prev.next != edge_ptr {
+				add_error(&errors, &ok, fmt.aprintf("Edge %d prev.next chain broken", i))
+			}
+		}
+
+		// If face exists, check all edges in cycle have same face
+		if edge.face != nil {
+			current := edge.next
+			visited := make(map[^HeEdge]bool, context.temp_allocator)
+			defer delete(visited)
+			visited[edge_ptr] = true
+
+			for current != nil && current != edge_ptr {
+				if current in visited {
+					add_error(
+						&errors,
+						&ok,
+						fmt.aprintf("Edge %d face cycle has loop before returning to start", i),
+					)
+					break
+				}
+				visited[current] = true
+
+				if current.face != edge.face {
+					add_error(
+						&errors,
+						&ok,
+						fmt.aprintf("Edge %d in face cycle has different face pointer", i),
+					)
+				}
+				current = current.next
+			}
+
+			if current != edge_ptr {
+				add_error(&errors, &ok, fmt.aprintf("Edge %d face cycle does not close", i))
+			}
+		}
+	}
+
+	// 2. Validate all nodes
+	for &node, i in he.nodes {
+		node_ptr := &he.nodes[i]
+
+		// Check edge exists
+		if node.edge == nil {
+			add_error(&errors, &ok, fmt.aprintf("Node %d has nil edge", i))
+			continue
+		}
+
+		// Check node.edge actually originates from this node
+		if node.edge.origin != node_ptr {
+			add_error(
+				&errors,
+				&ok,
+				fmt.aprintf("Node %d edge.origin doesn't point back to node", i),
+			)
+		}
+
+		// Check all outgoing edges from this node form a cycle via twin.next
+		current := node.edge
+		visited := make(map[^HeEdge]bool, context.temp_allocator)
+		defer delete(visited)
+		visited[current] = true
+
+		for {
+			if current.origin != node_ptr {
+				add_error(
+					&errors,
+					&ok,
+					fmt.aprintf(
+						"Node %d outgoing edge cycle contains edge with different origin",
+						i,
+					),
+				)
+				break
+			}
+
+			if current.twin == nil {
+				add_error(&errors, &ok, fmt.aprintf("Node %d outgoing edge has nil twin", i))
+				break
+			}
+
+			current = current.twin.next
+			if current == node.edge {
+				break
+			}
+
+			if current in visited {
+				add_error(
+					&errors,
+					&ok,
+					fmt.aprintf("Node %d outgoing edges have cycle before returning to start", i),
+				)
+				break
+			}
+			visited[current] = true
+		}
+	}
+
+	// 3. Validate all faces
+	for &face, i in he.faces {
+		face_ptr := &he.faces[i]
+
+		// Check inner edge exists
+		if face.edge == nil {
+			add_error(&errors, &ok, fmt.aprintf("Face %d has nil inner edge", i))
+			continue
+		}
+
+		// Check face.inner.face points back to this face
+		if face.edge.face != face_ptr {
+			add_error(
+				&errors,
+				&ok,
+				fmt.aprintf("Face %d inner edge doesn't point back to face", i),
+			)
+		}
+
+		// Traverse face cycle and ensure it's closed and all edges point to this face
+		current := face.edge
+		visited := make(map[^HeEdge]bool, context.temp_allocator)
+		defer delete(visited)
+		visited[current] = true
+		edge_count := 1
+
+		for {
+			if current.face != face_ptr {
+				add_error(
+					&errors,
+					&ok,
+					fmt.aprintf("Face %d contains edge with different face pointer", i),
+				)
+			}
+
+			current = current.next
+			if current == face.edge {
+				break
+			}
+
+			if current in visited {
+				add_error(
+					&errors,
+					&ok,
+					fmt.aprintf("Face %d edge cycle has loop before returning to start", i),
+				)
+				break
+			}
+			visited[current] = true
+			edge_count += 1
+
+			if edge_count > len(he.edges) {
+				add_error(
+					&errors,
+					&ok,
+					fmt.aprintf("Face %d edge cycle too long (infinite loop?)", i),
+				)
+				break
+			}
+		}
+
+		// A valid face should have at least 3 edges
+		if edge_count < 3 {
+			add_error(
+				&errors,
+				&ok,
+				fmt.aprintf("Face %d has only %d edges (need at least 3)", i, edge_count),
+			)
+		}
+	}
+
+	return ok, errors
 }
 
 he_empty_push_node :: proc(he: ^HeContainer) -> (^HeNode, int) {
@@ -116,7 +348,7 @@ he_init_from_polygon :: proc(
 	for i in 0 ..< len(created_edges) {
 		a := created_edges[i]
 		b := created_edges[(i + 1) % len(created_edges)]
-		face.inner = a
+		face.edge = a
 
 		a.next = b
 		b.prev = a
@@ -125,12 +357,13 @@ he_init_from_polygon :: proc(
 		twin_edge.origin = b.origin
 		twin_edge.twin = a
 		twin_edge.face = nil
-		face.outer = twin_edge
 		append(&created_twin_edges, twin_edge)
 
 		a.twin = twin_edge
 	}
 
+	// Reverse twin edges, because they are directed the opposite way that the normal edges are directed
+	slice.reverse(created_twin_edges[:])
 	// connect twin edges
 	for i in 0 ..< len(created_twin_edges) {
 		a := created_twin_edges[i]
@@ -249,13 +482,12 @@ he_split_face_by_nodes :: proc(he: ^HeContainer, start: ^HeNode, end: ^HeNode) {
 	start_edge.prev = new_twin
 
 	new_face, _ := he_empty_push_face(he)
-	old_face := end_prev.face
+	old_face := common_face
 
 	current_edge := end_prev
+	old_face.edge = end_prev
 	for {
 		current_edge.face = old_face
-		current_edge.face.inner = current_edge
-		current_edge.face.outer = current_edge.twin
 
 		current_edge = current_edge.next
 		if current_edge == end_prev {
@@ -264,10 +496,9 @@ he_split_face_by_nodes :: proc(he: ^HeContainer, start: ^HeNode, end: ^HeNode) {
 	}
 
 	current_edge = start_prev
+	new_face.edge = start_prev
 	for {
 		current_edge.face = new_face
-		current_edge.face.inner = current_edge
-		current_edge.face.outer = current_edge.twin
 
 		current_edge = current_edge.next
 		if current_edge == start_prev {
@@ -304,7 +535,7 @@ he_collect_edges_for_face :: proc(face: ^HeFace) -> []^HeEdge {
 	edges := make([dynamic]^HeEdge, context.temp_allocator)
 	defer delete(edges)
 
-	start := face.inner
+	start := face.edge
 	append(&edges, start)
 
 	// loop in a circle

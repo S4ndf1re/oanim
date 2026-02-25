@@ -5,4 +5,5 @@
 
 debug_build
 debug_build.dSYM/
+# executables
 oanim

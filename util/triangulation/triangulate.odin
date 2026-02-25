@@ -133,6 +133,20 @@ inner_angle_between :: proc(u, v, w: Vector2) -> f32 {
 	return angle
 }
 
+print_tree :: proc(tree: ^avl.Tree(TreeKey)) {
+	iter := avl.iterator(tree, .Forward)
+
+	for {
+		val, ok := avl.iterator_next(&iter)
+		if !ok {
+			break
+		}
+
+		fmt.printf("%d", val.value.edge.origin.original_idx)
+	}
+	fmt.println()
+}
+
 @(private)
 find_left_of :: proc(
 	tree: ^avl.Tree(TreeKey),
@@ -179,6 +193,10 @@ triangulate :: proc(
 		return nil, false
 	}
 	defer he_destroy(&he)
+	ok, errs := he_validate(&he)
+	if !ok {
+		fmt.printf("%v\n", errs)
+	}
 
 	nodes := he_get_nodes(&he, allocator)
 	defer delete(nodes, allocator)
@@ -292,16 +310,16 @@ triangulate :: proc(
 					helper[ej] = vi
 				}
 			}
-			fmt.printfln("")
-			fmt.printfln("")
 		}
 	}
+
+	assert(avl.len(&tree) == 0)
 
 	// Clone here, so that later changes will not affect anything
 	{
 		faces := he_get_faces(&he)
 		defer delete(faces)
-		for face in faces {
+		for face, i in faces {
 			triangulate_y_monotone(&he, face)
 		}
 	}
@@ -311,13 +329,11 @@ triangulate :: proc(
 	triangles := make([dynamic]Triangle)
 	defer delete(triangles)
 
-	fmt.printf("\nPrinting out triangesl\n")
 	faces := he_get_faces(&he)
 	defer delete(faces)
 	for face in faces {
-		he_print_face(face)
-		fmt.println()
 		edges := he_collect_edges_for_face(face)
+		defer delete(edges)
 		assert(len(edges) == 3)
 		root := edges[0]
 		append(
@@ -329,7 +345,6 @@ triangulate :: proc(
 				root.origin.original_idx,
 			},
 		)
-		delete(edges)
 	}
 
 	return slice.clone(triangles[:]), true
