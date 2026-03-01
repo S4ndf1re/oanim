@@ -1,7 +1,7 @@
-package basic_shapes
+package lib
 
-import "../polygons"
 import "core:math/linalg"
+import "polygons"
 import "shapes"
 import rl "vendor:raylib"
 import "vendor:raylib/rlgl"

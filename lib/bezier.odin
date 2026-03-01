@@ -1,4 +1,4 @@
-package basic_shapes
+package lib
 
 import "shapes"
 

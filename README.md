@@ -25,8 +25,9 @@ A single Plugin is loaded. This is simply a test plugin, and I plan to add more
 plugins, once the default library is loaded.
 
 - [x] Tessellation of non hole polygons
-- [x] Rendering of beziér curves
-- [x] Rendering of basic shapes (Connected beziér curves)
+- [x] Rendering of beziér curves, both filled and outlined
+- [x] Rendering of basic shapes (Connected beziér curves) (Circle + Rectangle),
+      both filled and outlined
 
 ## Planned
 

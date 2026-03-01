@@ -3,8 +3,8 @@ package simple_draw
 import rl "vendor:raylib"
 
 import util "../../lib"
-import "../../lib/basic_shapes"
-import "../../lib/basic_shapes/shapes"
+import "../../lib"
+import "../../lib/shapes"
 
 State :: struct {
 	frames:         util.Keyframes,
@@ -97,7 +97,7 @@ plugin_render :: proc() {
 	// 	rotationAngle = 90.0 * t,
 	// )
 
-	basic_shapes.fill_shape(
+	lib.fill_shape(
 		&state.circle,
 		t,
 		translation = shapes.Vector2{(f32)(window_w) * (1.0 - t), (f32)(window_h) / 2.0},

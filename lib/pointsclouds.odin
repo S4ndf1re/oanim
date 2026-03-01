@@ -4,7 +4,7 @@ import "core:mem"
 import "core:slice"
 import "polygons"
 
-import "basic_shapes/shapes"
+import "shapes"
 
 
 // implement simple graham scan algorithm
