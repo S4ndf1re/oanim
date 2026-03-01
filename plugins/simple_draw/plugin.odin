@@ -37,7 +37,7 @@ create_segment :: proc(kfs: ^util.Segment) {
 create_basic_shape :: proc(shape: ^util.Rectangle) {
 	util.destroy_basic_shape(shape)
 
-	fill_color := rl.RED
+	fill_color := rl.BLUE
 	fill_color.w = 50
 	shape^ = util.new_basic_rect(100.0, 100.0, rl.RED, fill_color)
 }

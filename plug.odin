@@ -40,6 +40,7 @@ Plugin :: struct {
 	loaded:     bool,
 }
 
+// Identify all plugins in the root folder
 identify_plugins :: proc(
 	root: string,
 	allocator: runtime.Allocator = context.allocator,

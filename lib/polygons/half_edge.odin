@@ -283,30 +283,24 @@ he_validate :: proc(he: ^HeContainer) -> (ok: bool, errors: [dynamic]string) {
 }
 
 // push a new node into the HEDS by allocating a new Node on the heap
-he_empty_push_node :: proc(
-	he: ^HeContainer,
-	allocator: runtime.Allocator = context.allocator,
-) -> (
-	^HeNode,
-	int,
-) {
-	node := new(HeNode)
+he_empty_push_node :: proc(he: ^HeContainer, allocator := context.allocator) -> (^HeNode, int) {
+	node := new(HeNode, allocator)
 	_ = append(&he.nodes, node)
 	idx := len(he.nodes) - 1
 	return node, idx
 }
 
 // push a new face into the HEDS by allocating a new Face on the heap
-he_empty_push_face :: proc(he: ^HeContainer) -> (^HeFace, int) {
-	face := new(HeFace)
+he_empty_push_face :: proc(he: ^HeContainer, allocator := context.allocator) -> (^HeFace, int) {
+	face := new(HeFace, allocator)
 	_ = append(&he.faces, face)
 	idx := len(he.faces) - 1
 	return face, idx
 }
 
 // push a new edge into the HEDS by allocating a new Edge on the heap
-he_empty_push_edge :: proc(he: ^HeContainer) -> (^HeEdge, int) {
-	edge := new(HeEdge)
+he_empty_push_edge :: proc(he: ^HeContainer, allocator := context.allocator) -> (^HeEdge, int) {
+	edge := new(HeEdge, allocator)
 	_ = append(&he.edges, edge)
 	idx := len(he.edges) - 1
 	return edge, idx
@@ -409,8 +403,13 @@ he_init_from_polygon :: proc(
 }
 
 // Query all edges that are outgoing from node. Use simple twin.next iteration until node.edge is reached again
-he_query_all_outgoing_edges :: proc(node: ^HeNode, debug: bool = false) -> []^HeEdge {
-	nodes := make([dynamic]^HeEdge, context.temp_allocator)
+he_query_all_outgoing_edges :: proc(
+	node: ^HeNode,
+	allocator := context.allocator,
+	temp_allocator := context.temp_allocator,
+	debug: bool = false,
+) -> []^HeEdge {
+	nodes := make([dynamic]^HeEdge, temp_allocator)
 	defer delete(nodes)
 
 	start_edge := node.edge
@@ -434,20 +433,22 @@ he_query_all_outgoing_edges :: proc(node: ^HeNode, debug: bool = false) -> []^He
 		append(&nodes, current_edge)
 	}
 
-	return slice.clone(nodes[:])
+	return slice.clone(nodes[:], allocator)
 }
 
 // Query the outgoing edge of node for a given face, or nil, false if there is no outgoing edge of node for the face
 he_query_outgoing_edge_for_face :: proc(
 	node: ^HeNode,
 	face: ^HeFace,
+	allocator := context.allocator,
+	temp_allocator := context.temp_allocator,
 	debug: bool = false,
 ) -> (
 	^HeEdge,
 	bool,
 ) {
-	outgoing_edges := he_query_all_outgoing_edges(node, debug)
-	defer delete(outgoing_edges)
+	outgoing_edges := he_query_all_outgoing_edges(node, allocator, temp_allocator, debug)
+	defer delete(outgoing_edges, allocator)
 
 	for edge in outgoing_edges {
 		if edge.face == face {
@@ -459,11 +460,16 @@ he_query_outgoing_edge_for_face :: proc(
 }
 
 // Get all faces that a node can reach using outgoing edges out of node without hops
-he_query_all_faces_for_node :: proc(node: ^HeNode) -> map[^HeFace]bool {
-	outgoing_edges := he_query_all_outgoing_edges(node)
-	defer delete(outgoing_edges)
+he_query_all_faces_for_node :: proc(
+	node: ^HeNode,
+	allocator := context.allocator,
+	temp_allocator := context.temp_allocator,
+	debug: bool = false,
+) -> map[^HeFace]bool {
+	outgoing_edges := he_query_all_outgoing_edges(node, allocator, temp_allocator, debug)
+	defer delete(outgoing_edges, allocator)
 
-	set := make(map[^HeFace]bool)
+	set := make(map[^HeFace]bool, allocator)
 
 	for edge in outgoing_edges {
 		if edge.face != nil {
@@ -475,12 +481,19 @@ he_query_all_faces_for_node :: proc(node: ^HeNode) -> map[^HeFace]bool {
 }
 
 // Find a face, that both a and b can reach without hops
-he_match_face_for_node :: proc(a, b: ^HeNode) -> (^HeFace, bool) {
-	a_faces := he_query_all_faces_for_node(a)
-	b_faces := he_query_all_faces_for_node(b)
+he_match_face_for_node :: proc(
+	a, b: ^HeNode,
+	allocator := context.allocator,
+	temp_allocator := context.temp_allocator,
+	debug: bool = false,
+) -> (
+	^HeFace,
+	bool,
+) {
+	a_faces := he_query_all_faces_for_node(a, allocator, temp_allocator, debug)
+	b_faces := he_query_all_faces_for_node(b, allocator, temp_allocator, debug)
 	defer delete(a_faces)
 	defer delete(b_faces)
-
 
 	for k, v in a_faces {
 		if k in b_faces {
@@ -499,9 +512,11 @@ he_split_face_by_nodes :: proc(
 	he: ^HeContainer,
 	start: ^HeNode,
 	end: ^HeNode,
+	allocator := context.allocator,
+	temp_allocator := context.temp_allocator,
 	debug: bool = false,
 ) {
-	common_face, ok := he_match_face_for_node(start, end)
+	common_face, ok := he_match_face_for_node(start, end, allocator, temp_allocator, debug)
 	if !ok {
 		return
 	}
@@ -511,7 +526,13 @@ he_split_face_by_nodes :: proc(
 
 
 	// Get previous edges
-	end_edge, end_found := he_query_outgoing_edge_for_face(end, common_face, debug)
+	end_edge, end_found := he_query_outgoing_edge_for_face(
+		end,
+		common_face,
+		allocator,
+		temp_allocator,
+		debug,
+	)
 	if !end_found {return}
 	end_prev := end_edge.prev
 	if debug {
@@ -519,7 +540,13 @@ he_split_face_by_nodes :: proc(
 		fmt.println("End.prev Edge:", end_prev)
 	}
 
-	start_edge, start_found := he_query_outgoing_edge_for_face(start, common_face, debug)
+	start_edge, start_found := he_query_outgoing_edge_for_face(
+		start,
+		common_face,
+		allocator,
+		temp_allocator,
+		debug,
+	)
 	if !start_found {return}
 	start_prev := start_edge.prev
 	if debug {
@@ -586,21 +613,25 @@ he_split_face_by_nodes :: proc(
 	}
 }
 
-he_get_nodes :: proc(he: ^HeContainer) -> []^HeNode {
-	return slice.clone(he.nodes[:])
+he_get_nodes :: proc(he: ^HeContainer, allocator := context.allocator) -> []^HeNode {
+	return slice.clone(he.nodes[:], allocator)
 }
 
-he_get_faces :: proc(he: ^HeContainer) -> []^HeFace {
-	return slice.clone(he.faces[:])
+he_get_faces :: proc(he: ^HeContainer, allocator := context.allocator) -> []^HeFace {
+	return slice.clone(he.faces[:], allocator)
 }
 
-he_get_edges :: proc(he: ^HeContainer) -> []^HeEdge {
-	return slice.clone(he.edges[:])
+he_get_edges :: proc(he: ^HeContainer, allocator := context.allocator) -> []^HeEdge {
+	return slice.clone(he.edges[:], allocator)
 }
 
 // Ger all edges for a single face
-he_collect_edges_for_face :: proc(face: ^HeFace) -> []^HeEdge {
-	edges := make([dynamic]^HeEdge, context.temp_allocator)
+he_collect_edges_for_face :: proc(
+	face: ^HeFace,
+	allocator := context.allocator,
+	temp_allocator := context.temp_allocator,
+) -> []^HeEdge {
+	edges := make([dynamic]^HeEdge, temp_allocator)
 	defer delete(edges)
 
 	start := face.edge
@@ -617,8 +648,7 @@ he_collect_edges_for_face :: proc(face: ^HeFace) -> []^HeEdge {
 		append(&edges, current)
 	}
 
-
-	return slice.clone(edges[:])
+	return slice.clone(edges[:], allocator)
 }
 
 he_print_face :: proc(face: ^HeFace, idx: int = 0) {
@@ -642,15 +672,15 @@ he_print :: proc(he: ^HeContainer) {
 }
 
 // Destroy the container and all heap allocated data
-he_destroy :: proc(he: ^HeContainer) {
+he_destroy :: proc(he: ^HeContainer, allocator := context.allocator) {
 	for e in he.edges {
-		free(e)
+		free(e, allocator)
 	}
 	for f in he.faces {
-		free(f)
+		free(f, allocator)
 	}
 	for n in he.nodes {
-		free(n)
+		free(n, allocator)
 	}
 	delete(he.edges)
 	delete(he.faces)
