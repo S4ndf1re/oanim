@@ -24,6 +24,8 @@ beziér curves and rectangles. A simple Keyframe system is implemented as well.
 A single Plugin is loaded. This is simply a test plugin, and I plan to add more
 plugins, once the default library is loaded.
 
+- [x] Tessellation of non hole polygons
+
 ## Planned
 
 Ok ok. I have to admit. I really love the idea of adding scripting support.
@@ -35,3 +37,9 @@ I kind of like the concept of statically typed embeddable scripting languages,
 and so far, `umka` as a concept really impressed me. Hence, this might be a good
 learning experience. Maybe, I will return to my original project of compiling C
 (or another language).
+
+- [ ] Function Rendering
+- [ ] Text rendering
+- [ ] Tessellation of hole polygons
+- [ ] Sprites
+- [ ] Render To Video
