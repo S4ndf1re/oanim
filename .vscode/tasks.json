@@ -10,6 +10,17 @@
         ".",
         "-define:RAYLIB_SHARED=true"
       ]
+    },
+    {
+      "type": "shell",
+      "label": "Make simple_draw",
+      "command": "make",
+      "args": [
+        "build"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/plugins/simple_draw"
+      }
     }
   ]
 }
