@@ -50,19 +50,20 @@ keyframes_reached_end :: proc(k: ^Keyframes) -> bool {
 	return k.current >= len(k.keys)
 }
 
-advance :: proc(keyframes: ^Keyframes, dt: f32) {
-	keyframes.time += dt
+advance :: proc(dt: f32, keyframes: ..^Keyframes) {
+	for key in keyframes {
+		key.time += dt
 
-	if keyframes.loop && keyframes_reached_end(keyframes) {
-		// restart
-		keyframes.current = 0
-	}
+		if key.loop && keyframes_reached_end(key) {
+			// restart
+			key.current = 0
+		}
 
-	for keyframes.current < len(keyframes.keys) &&
-	    keyframes.time >= keyframes.keys[keyframes.current].duration {
+		for key.current < len(key.keys) && key.time >= key.keys[key.current].duration {
 
-		keyframes.time -= keyframes.keys[keyframes.current].duration
-		keyframes.current += 1
+			key.time -= key.keys[key.current].duration
+			key.current += 1
+		}
 	}
 }
 

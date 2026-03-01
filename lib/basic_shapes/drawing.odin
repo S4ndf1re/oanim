@@ -1,8 +1,8 @@
-package lib
+package basic_shapes
 
-import "core:fmt"
+import "../polygons"
 import "core:math/linalg"
-import "polygons"
+import "shapes"
 import rl "vendor:raylib"
 import "vendor:raylib/rlgl"
 
@@ -10,7 +10,7 @@ import "vendor:raylib/rlgl"
 // this is a near one to one copy from raylib. I wanted to make sure that this function can be called from within an rlgl.Begin() -> rlgl.End() Block.
 // The Raylib implementation start a new block
 @(private)
-draw_line_in_gl_context :: proc(start, end: Vector2, thickness: f32) {
+draw_line_in_gl_context :: proc(start, end: shapes.Vector2, thickness: f32, depth: f32 = 0.0) {
 	diff := end - start
 	length := linalg.length(diff)
 
@@ -18,24 +18,24 @@ draw_line_in_gl_context :: proc(start, end: Vector2, thickness: f32) {
 		factor := thickness / (2.0 * length)
 		norm := polygons.normal(diff) * factor
 
-		rlgl.Vertex2f(start.x - norm.x, start.y - norm.y)
-		rlgl.Vertex2f(start.x + norm.x, start.y + norm.y)
-		rlgl.Vertex2f(end.x + norm.x, end.y + norm.y)
+		rlgl.Vertex3f(start.x - norm.x, start.y - norm.y, depth)
+		rlgl.Vertex3f(start.x + norm.x, start.y + norm.y, depth)
+		rlgl.Vertex3f(end.x + norm.x, end.y + norm.y, depth)
 
-		rlgl.Vertex2f(end.x + norm.x, end.y + norm.y)
-		rlgl.Vertex2f(end.x - norm.x, end.y - norm.y)
-		rlgl.Vertex2f(start.x - norm.x, start.y - norm.y)
+		rlgl.Vertex3f(end.x + norm.x, end.y + norm.y, depth)
+		rlgl.Vertex3f(end.x - norm.x, end.y - norm.y, depth)
+		rlgl.Vertex3f(start.x - norm.x, start.y - norm.y, depth)
 	}
 }
 
 // Draw a simple curve with thickness, transformed by translation and rotationAngle (around z axis).
 // The curve is assumed to be a beziér curve and is drawn until `t_until`
 draw_curve :: proc(
-	curve: Segment,
+	curve: shapes.Segment,
 	t_until: f32,
 	step_size: f32,
 	color: rl.Color = rl.RED,
-	translation: Vector2 = {0.0, 0.0},
+	translation: shapes.Vector2 = {0.0, 0.0},
 	rotationAngle: f32 = 0.0,
 	thickness: f32 = 1.0,
 ) {
@@ -75,16 +75,16 @@ draw_curve :: proc(
 
 // Same as draw_curve, but fill its interior using tesselation
 fill_curve :: proc(
-	curve: Segment,
+	curve: shapes.Segment,
 	t_until: f32,
 	step_size: f32,
 	color: rl.Color = rl.RED,
 	fill_color: rl.Color = rl.RED,
-	translation: Vector2 = {0.0, 0.0},
+	translation: shapes.Vector2 = {0.0, 0.0},
 	rotationAngle: f32 = 0.0,
 	thickness: f32 = 1.0,
 ) {
-	curves := [?]Segment{curve}
+	curves := [?]shapes.Segment{curve}
 	t_untils := [?]f32{t_until}
 	fill_curves(
 		curves[:],
@@ -100,16 +100,16 @@ fill_curve :: proc(
 
 // Fill multiple curves using tesselation
 fill_curves :: proc(
-	curves: []Segment,
+	curves: []shapes.Segment,
 	t_until: []f32,
 	step_size: f32,
 	color: rl.Color = rl.RED,
 	fill_color: rl.Color = rl.RED,
-	translation: Vector2 = {0.0, 0.0},
+	translation: shapes.Vector2 = {0.0, 0.0},
 	rotationAngle: f32 = 0.0,
 	thickness: f32 = 1.0,
 ) {
-	points := make([dynamic]Vector2)
+	points := make([dynamic]shapes.Vector2)
 	defer delete(points)
 
 	rlgl.DrawRenderBatchActive()
@@ -138,7 +138,7 @@ fill_curves :: proc(
 					_ = append(&points, pos)
 					t += step_size
 
-					draw_line_in_gl_context(old_pos, pos, thickness)
+					draw_line_in_gl_context(old_pos, pos, thickness, -1.0)
 
 					old_pos = pos
 				}
@@ -146,7 +146,7 @@ fill_curves :: proc(
 				// draw final segment, since, t < t_until
 				pos := decas(curve.curve, curve.t_until)
 				_ = append(&points, pos)
-				draw_line_in_gl_context(old_pos, pos, thickness)
+				draw_line_in_gl_context(old_pos, pos, thickness, -1.0)
 			}
 		}
 
@@ -165,9 +165,9 @@ fill_curves :: proc(
 				v1 := compressed[triangle[0]]
 				v2 := compressed[triangle[1]]
 				v3 := compressed[triangle[2]]
-				rlgl.Vertex2f(v1.x, v1.y)
-				rlgl.Vertex2f(v2.x, v2.y)
-				rlgl.Vertex2f(v3.x, v3.y)
+				rlgl.Vertex3f(v1.x, v1.y, 0.0)
+				rlgl.Vertex3f(v2.x, v2.y, 0.0)
+				rlgl.Vertex3f(v3.x, v3.y, 0.0)
 			}
 		}
 	}

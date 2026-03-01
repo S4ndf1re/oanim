@@ -1,14 +1,13 @@
-package lib
+package basic_shapes
 
-Vector2 :: [2]f32
-Segment :: []Vector2
+import "shapes"
 
 // compute decasteljau bezier point using control `points` and a parameter `t`
-decas :: proc(points: Segment, t: f32) -> Vector2 {
+decas :: proc(points: shapes.Segment, t: f32) -> shapes.Vector2 {
 	assert(len(points) >= 1)
 	n := len(points)
 
-	working_points := make(Segment, n, allocator = context.temp_allocator)
+	working_points := make(shapes.Segment, n, allocator = context.temp_allocator)
 	defer delete(working_points, allocator = context.temp_allocator)
 	copy(working_points[:], points[:])
 

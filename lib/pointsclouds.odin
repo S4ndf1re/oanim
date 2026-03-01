@@ -4,29 +4,32 @@ import "core:mem"
 import "core:slice"
 import "polygons"
 
+import "basic_shapes/shapes"
+
 
 // implement simple graham scan algorithm
 // Returns the CW winded convex hull for points
 convex_hull :: proc(
-	points: []Vector2,
+	points: []shapes.Vector2,
 	allocator: mem.Allocator = context.allocator,
 	temp_allocator: mem.Allocator = context.temp_allocator,
-) -> []Vector2 {
+) -> []shapes.Vector2 {
 	if len(points) <= 2 {
 		return slice.clone(points)
 	}
 
-	ps := make([]Vector2, len(points), temp_allocator)
+	ps := make([]shapes.Vector2, len(points), temp_allocator)
 	defer delete(ps, temp_allocator)
 	copy(ps, points)
 
 	slice.sort_by(
 		ps,
-		proc(a, b: Vector2) -> bool {if a.x != b.x {return a.x < b.x} else {return a.y < b.y}},
+		proc(a, b: shapes.Vector2) -> bool {if a.x != b.x {return a.x < b.x}
+			else {return a.y < b.y}},
 	)
 
-	upper_hull := make([dynamic]Vector2, temp_allocator)
-	lower_hull := make([dynamic]Vector2, temp_allocator)
+	upper_hull := make([dynamic]shapes.Vector2, temp_allocator)
+	lower_hull := make([dynamic]shapes.Vector2, temp_allocator)
 
 	defer delete(upper_hull)
 	defer delete(lower_hull)
@@ -65,7 +68,7 @@ convex_hull :: proc(
 		append(&lower_hull, vert)
 	}
 
-	result := make([]Vector2, len(upper_hull) + len(lower_hull) - 2)
+	result := make([]shapes.Vector2, len(upper_hull) + len(lower_hull) - 2)
 	copy(result[:len(upper_hull)], upper_hull[:])
 	copy(result[len(upper_hull):], lower_hull[1:len(lower_hull) - 1])
 
@@ -75,7 +78,7 @@ convex_hull :: proc(
 // Assume, this is a convex hull, otherwise this will likeley result in unwanted behaviour
 // Assume CW winding order
 to_triangle_fan_indices :: proc(
-	points: []Vector2,
+	points: []shapes.Vector2,
 	allocator: mem.Allocator = context.allocator,
 	temp_allocator: mem.Allocator = context.temp_allocator,
 ) -> (
