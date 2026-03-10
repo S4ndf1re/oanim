@@ -1,5 +1,6 @@
 package lib
 
+import "core:fmt"
 import "core:math/linalg"
 import "polygons"
 import "shapes"
@@ -37,17 +38,14 @@ draw_curve :: proc(
 	color: rl.Color = rl.RED,
 	translation: shapes.Vector2 = {0.0, 0.0},
 	rotationAngle: f32 = 0.0,
-	thickness: f32 = 1.0,
+	scale: f32 = 1.0,
 ) {
 	t: f32 = 0.0
 
-	rlgl.DrawRenderBatchActive()
 	rlgl.PushMatrix()
-	defer rlgl.PopMatrix()
-	rlgl.MatrixMode(rlgl.MODELVIEW)
 	rlgl.Translatef(translation.x, translation.y, 0.0)
 	rlgl.Rotatef(rotationAngle, 0.0, 0.0, 1.0)
-	defer rlgl.DrawRenderBatchActive()
+	rlgl.Scalef(scale, scale, scale)
 
 	rlgl.Begin(rlgl.TRIANGLES)
 	{
@@ -59,7 +57,7 @@ draw_curve :: proc(
 
 			for t < t_until {
 				pos := decas(curve, t)
-				draw_line_in_gl_context(old_pos, pos, thickness)
+				draw_line_in_gl_context(old_pos, pos, curve.thickness)
 
 				old_pos = pos
 				t += step_size
@@ -67,10 +65,11 @@ draw_curve :: proc(
 
 			// draw final segment, since, t < t_until
 			pos := decas(curve, t_until)
-			draw_line_in_gl_context(old_pos, pos, thickness)
+			draw_line_in_gl_context(old_pos, pos, curve.thickness)
 		}
 	}
 	rlgl.End()
+	rlgl.PopMatrix()
 }
 
 // Same as draw_curve, but fill its interior using tesselation
@@ -82,7 +81,7 @@ fill_curve :: proc(
 	fill_color: rl.Color = rl.RED,
 	translation: shapes.Vector2 = {0.0, 0.0},
 	rotationAngle: f32 = 0.0,
-	thickness: f32 = 1.0,
+	scale: f32 = 1.0,
 ) {
 	curves := [?]shapes.Segment{curve}
 	t_untils := [?]f32{t_until}
@@ -94,7 +93,7 @@ fill_curve :: proc(
 		fill_color,
 		translation,
 		rotationAngle,
-		thickness,
+		scale,
 	)
 }
 
@@ -107,18 +106,15 @@ fill_curves :: proc(
 	fill_color: rl.Color = rl.RED,
 	translation: shapes.Vector2 = {0.0, 0.0},
 	rotationAngle: f32 = 0.0,
-	thickness: f32 = 1.0,
+	scale: f32 = 1.0,
 ) {
 	points := make([dynamic]shapes.Vector2)
 	defer delete(points)
 
-	rlgl.DrawRenderBatchActive()
 	rlgl.PushMatrix()
-	defer rlgl.PopMatrix()
-	rlgl.MatrixMode(rlgl.MODELVIEW)
 	rlgl.Translatef(translation.x, translation.y, 0.0)
 	rlgl.Rotatef(rotationAngle, 0.0, 0.0, 1.0)
-	defer rlgl.DrawRenderBatchActive()
+	rlgl.Scalef(scale, scale, scale)
 
 	rlgl.Begin(rlgl.TRIANGLES)
 	{
@@ -138,7 +134,7 @@ fill_curves :: proc(
 					_ = append(&points, pos)
 					t += step_size
 
-					draw_line_in_gl_context(old_pos, pos, thickness, -1.0)
+					draw_line_in_gl_context(old_pos, pos, curve.curve.thickness, -1.0)
 
 					old_pos = pos
 				}
@@ -146,7 +142,7 @@ fill_curves :: proc(
 				// draw final segment, since, t < t_until
 				pos := decas(curve.curve, curve.t_until)
 				_ = append(&points, pos)
-				draw_line_in_gl_context(old_pos, pos, thickness, -1.0)
+				draw_line_in_gl_context(old_pos, pos, curve.curve.thickness, -1.0)
 			}
 		}
 
@@ -172,4 +168,5 @@ fill_curves :: proc(
 		}
 	}
 	rlgl.End()
+	rlgl.PopMatrix()
 }

@@ -30,21 +30,25 @@ new_basic_rect :: proc(
 	rect.fill_color = fill_color
 	rect.segments = make([]Segment, 4)
 
-	rect.segments[0] = make([]Vector2, 2)
-	rect.segments[0][0] = top_left
-	rect.segments[0][1] = top_right
+	rect.segments[0].points = make([]Vector2, 2)
+	rect.segments[0].points[0] = top_left
+	rect.segments[0].points[1] = top_right
+	rect.segments[0].thickness = 1.0
 
-	rect.segments[1] = make([]Vector2, 2)
-	rect.segments[1][0] = top_right
-	rect.segments[1][1] = bottom_right
+	rect.segments[1].points = make([]Vector2, 2)
+	rect.segments[1].points[0] = top_right
+	rect.segments[1].points[1] = bottom_right
+	rect.segments[1].thickness = 1.0
 
-	rect.segments[2] = make([]Vector2, 2)
-	rect.segments[2][0] = bottom_right
-	rect.segments[2][1] = bottom_left
+	rect.segments[2].points = make([]Vector2, 2)
+	rect.segments[2].points[0] = bottom_right
+	rect.segments[2].points[1] = bottom_left
+	rect.segments[2].thickness = 1.0
 
-	rect.segments[3] = make([]Vector2, 2)
-	rect.segments[3][0] = bottom_left
-	rect.segments[3][1] = top_left
+	rect.segments[3].points = make([]Vector2, 2)
+	rect.segments[3].points[0] = bottom_left
+	rect.segments[3].points[1] = top_left
+	rect.segments[3].thickness = 1.0
 
 	return rect
 }

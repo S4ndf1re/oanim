@@ -5,8 +5,12 @@
 
 debug_build
 debug_build.dSYM/
+plugin.dylib.dSYM/
 # executables
 oanim
 
 # Editors
 .zed
+
+# Nix related
+result/

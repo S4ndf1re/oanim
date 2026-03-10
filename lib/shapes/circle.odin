@@ -11,8 +11,6 @@ Circle :: struct {
 
 
 new_basic_circle :: proc(r: f32, color := rl.RED, fill_color := rl.RED) -> Circle {
-
-
 	circle := Circle{}
 	circle.r = r
 	circle.color = color
@@ -33,32 +31,36 @@ new_basic_circle :: proc(r: f32, color := rl.RED, fill_color := rl.RED) -> Circl
 	}
 
 	// Segment top left
-	circle.segments[3] = make([]Vector2, 4)
-	circle.segments[3][3] = Vector2{0, a}
-	circle.segments[3][2] = Vector2{b, c}
-	circle.segments[3][1] = Vector2{c, b}
-	circle.segments[3][0] = Vector2{a, 0}
+	circle.segments[3].points = make([]Vector2, 4)
+	circle.segments[3].points[3] = Vector2{0, a}
+	circle.segments[3].points[2] = Vector2{b, c}
+	circle.segments[3].points[1] = Vector2{c, b}
+	circle.segments[3].points[0] = Vector2{a, 0}
+	circle.segments[3].thickness = 1.0
 
 	// Segment bottom left
-	circle.segments[2] = make([]Vector2, 4)
-	circle.segments[2][3] = Vector2{a, -0}
-	circle.segments[2][2] = Vector2{c, -b}
-	circle.segments[2][1] = Vector2{b, -c}
-	circle.segments[2][0] = Vector2{0, -a}
+	circle.segments[2].points = make([]Vector2, 4)
+	circle.segments[2].points[3] = Vector2{a, -0}
+	circle.segments[2].points[2] = Vector2{c, -b}
+	circle.segments[2].points[1] = Vector2{b, -c}
+	circle.segments[2].points[0] = Vector2{0, -a}
+	circle.segments[2].thickness = 1.0
 
 	// Segment bottom right
-	circle.segments[1] = make([]Vector2, 4)
-	circle.segments[1][3] = Vector2{0, -a}
-	circle.segments[1][2] = Vector2{-b, -c}
-	circle.segments[1][1] = Vector2{-c, -b}
-	circle.segments[1][0] = Vector2{-a, 0}
+	circle.segments[1].points = make([]Vector2, 4)
+	circle.segments[1].points[3] = Vector2{0, -a}
+	circle.segments[1].points[2] = Vector2{-b, -c}
+	circle.segments[1].points[1] = Vector2{-c, -b}
+	circle.segments[1].points[0] = Vector2{-a, 0}
+	circle.segments[1].thickness = 1.0
 
 	// Segment top right
-	circle.segments[0] = make([]Vector2, 4)
-	circle.segments[0][3] = Vector2{-a, 0}
-	circle.segments[0][2] = Vector2{-c, b}
-	circle.segments[0][1] = Vector2{-b, c}
-	circle.segments[0][0] = Vector2{0, a}
+	circle.segments[0].points = make([]Vector2, 4)
+	circle.segments[0].points[3] = Vector2{-a, 0}
+	circle.segments[0].points[2] = Vector2{-c, b}
+	circle.segments[0].points[1] = Vector2{-b, c}
+	circle.segments[0].points[0] = Vector2{0, a}
+	circle.segments[0].thickness = 1.0
 
 	return circle
 }

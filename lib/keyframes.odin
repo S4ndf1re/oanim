@@ -21,28 +21,29 @@ Keyframes :: struct {
 
 
 // Clear all keyframes
-clear :: proc(kfs: ^Keyframes) {
-	delete(kfs.keys)
+clear_keyframes :: proc(kfs: ^Keyframes) {
+	if kfs.keys != nil {
+		delete(kfs.keys)
+	}
 	kfs.keys = make([dynamic]Keyframe)
 }
 
 // Initialize a new keyframe
-init :: proc(loop: bool) -> Keyframes {
-	frames := Keyframes{}
+init :: proc(frames: ^Keyframes, loop: bool) {
 	frames.loop = loop
 	frames.keys = make([dynamic]Keyframe)
-
-	return frames
 }
 
 // Push a keyframe onto the keyframe player
-push :: proc(kfs: ^Keyframes, frame: Keyframe) {
+push_keyframe :: proc(kfs: ^Keyframes, frame: Keyframe) {
 	_ = append(&kfs.keys, frame)
 }
 
 // Delete the keyframes
-destroy :: proc(kfs: ^Keyframes) {
-	delete(kfs.keys)
+destroy_keyframes :: proc(kfs: ^Keyframes) {
+	if kfs.keys != nil {
+		delete(kfs.keys)
+	}
 }
 
 @(private)
@@ -52,19 +53,25 @@ keyframes_reached_end :: proc(k: ^Keyframes) -> bool {
 
 advance :: proc(dt: f32, keyframes: ..^Keyframes) {
 	for key in keyframes {
-		key.time += dt
-
-		if key.loop && keyframes_reached_end(key) {
-			// restart
-			key.current = 0
-		}
-
-		for key.current < len(key.keys) && key.time >= key.keys[key.current].duration {
-
-			key.time -= key.keys[key.current].duration
-			key.current += 1
-		}
+		advance_single(dt, key)
 	}
+}
+
+advance_single :: proc(dt: f32, key: ^Keyframes) -> bool {
+	key.time += dt
+
+	if key.loop && keyframes_reached_end(key) {
+		// restart
+		key.current = 0
+	}
+
+	for key.current < len(key.keys) && key.time >= key.keys[key.current].duration {
+
+		key.time -= key.keys[key.current].duration
+		key.current += 1
+	}
+
+	return !key.loop && keyframes_reached_end(key)
 }
 
 get_value :: proc(k: ^Keyframes) -> f32 {
@@ -85,4 +92,9 @@ lerp :: proc(start, end, t: f32) -> f32 {
 	diff := end - start
 
 	return t * diff + start
+}
+
+restart_keyframes :: proc(kfs: ^Keyframes) {
+	kfs.current = 0
+	kfs.time = 0.0
 }

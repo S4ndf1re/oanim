@@ -42,6 +42,7 @@ draw_shape_until :: proc(
 	t: f32,
 	translation: shapes.Vector2 = {0.0, 0.0},
 	rotationAngle: f32 = 0.0,
+	scale: f32 = 1.0,
 ) {
 	ts := make([]f32, len(shape.segments))
 	split_t_into_ts(shape, t, ts)
@@ -52,18 +53,32 @@ draw_shape_until :: proc(
 		draw_curve(
 			z.shape,
 			z.t,
-			0.001,
+			0.01,
 			color = shape.color,
 			translation = translation,
 			rotationAngle = rotationAngle,
+			scale = scale,
 		)
 	}
 }
 
 // Draw a complete shape
-draw_shape_all :: proc(shape: ^shapes.BasicShape) {
+draw_shape_all :: proc(
+	shape: ^shapes.BasicShape,
+	translation: shapes.Vector2 = {0.0, 0.0},
+	rotationAngle: f32 = 0.0,
+	scale: f32 = 1.0,
+) {
 	for s in shape.segments {
-		draw_curve(s, 1.0, 0.001, color = shape.color)
+		draw_curve(
+			s,
+			1.0,
+			0.01,
+			color = shape.color,
+			translation = translation,
+			rotationAngle = rotationAngle,
+			scale = scale,
+		)
 	}
 }
 
@@ -78,6 +93,7 @@ fill_shape_until :: proc(
 	t: f32,
 	translation: shapes.Vector2 = {0.0, 0.0},
 	rotationAngle: f32 = 0.0,
+	scale: f32 = 1.0,
 ) {
 	ts := make([]f32, len(shape.segments))
 	split_t_into_ts(shape, t, ts)
@@ -90,6 +106,7 @@ fill_shape_until :: proc(
 		fill_color = shape.fill_color,
 		translation = translation,
 		rotationAngle = rotationAngle,
+		scale = scale,
 	)
 }
 
@@ -98,6 +115,7 @@ fill_shape_all :: proc(
 	shape: ^shapes.BasicShape,
 	translation: shapes.Vector2 = {0.0, 0.0},
 	rotationAngle: f32 = 0.0,
+	scale: f32 = 1.0,
 ) {
 	ts := make([]f32, len(shape.segments))
 	slice.fill(ts, 1.0)
@@ -105,11 +123,12 @@ fill_shape_all :: proc(
 	fill_curves(
 		shape.segments,
 		ts,
-		0.001,
+		0.01,
 		color = shape.color,
 		fill_color = shape.fill_color,
 		translation = translation,
 		rotationAngle = rotationAngle,
+		scale = scale,
 	)
 }
 

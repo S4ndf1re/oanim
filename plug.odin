@@ -1,10 +1,10 @@
 package oanim
 
+import "core:time"
 import "base:runtime"
 import "core:dynlib"
 import "core:fmt"
-import "core:os"
-import "core:os/os2"
+import os "core:os/os2"
 import "core:slice"
 import "core:strings"
 
@@ -23,7 +23,6 @@ PLUGIN_SHUTDOWN :: "plugin_shutdown"
 PLUGIN_MEMORY :: "plugin_memory"
 PLUGIN_HOT_RELOAD :: "plugin_hot_reload"
 
-
 // Descriptor of a simple plugin
 Plugin :: struct {
 	path:       string,
@@ -36,7 +35,7 @@ Plugin :: struct {
 
 	// The loaded library
 	lib:        Maybe(dynlib.Library),
-	last_time:  Maybe(os.File_Time),
+	last_time:  Maybe(time.Time),
 	loaded:     bool,
 }
 
@@ -49,7 +48,7 @@ identify_plugins :: proc(
 	[]Plugin,
 	bool,
 ) {
-	files, err := os2.read_all_directory_by_path("plugins/", context.allocator)
+	files, err := os.read_all_directory_by_path(root, context.allocator)
 	if err != nil {
 		fmt.printfln("%v", err)
 		return nil, false
@@ -61,7 +60,7 @@ identify_plugins :: proc(
 	defer delete(plugins)
 
 	for file in files {
-		if os2.is_dir(file.fullpath) {
+		if os.is_dir(file.fullpath) {
 			append(&plugins, Plugin{path = file.name})
 		}
 	}
@@ -102,7 +101,8 @@ load_plugin :: proc(plugin: ^Plugin) {
 
 	lib, ok := dynlib.load_library(path)
 	if !ok {
-		fmt.printf("\tCould not found path: %s\n", path)
+		fmt.println(dynlib.last_error())
+		fmt.printf("\tCould not find path: %s\n", path)
 		return
 	}
 
@@ -158,6 +158,8 @@ init_plugins :: proc(plugins: []Plugin) {
 	for plug in plugins {
 		if plug.loaded && plug.init != nil {
 			plug.init()
+            // NOTE: call hot reload here, because that could be used to initialize state
+			plug.hot_reload(plug.memory())
 		}
 	}
 }
