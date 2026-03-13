@@ -3,12 +3,12 @@ package oanim
 import "base:runtime"
 import "core:fmt"
 import "core:math"
-import "core:os/os2"
+import "core:os"
 import rl "vendor:raylib"
 import "vendor:raylib/rlgl"
 
 main :: proc() {
-	cwd, cwd_err := os2.get_executable_directory(context.allocator)
+	cwd, cwd_err := os.get_executable_directory(context.allocator)
 	if cwd_err != nil {
 		fmt.println(cwd_err)
 		return

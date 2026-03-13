@@ -4,7 +4,7 @@ import "core:time"
 import "base:runtime"
 import "core:dynlib"
 import "core:fmt"
-import os "core:os/os2"
+import os "core:os"
 import "core:slice"
 import "core:strings"
 
@@ -68,6 +68,8 @@ identify_plugins :: proc(
 	return slice.clone(plugins[:]), true
 }
 
+
+// Load all identified plugins by loading a dynamic library and extracting symbols in form of odin functions
 load_all_plugins :: proc(plugins: []Plugin) {
 	fmt.printf("Reloading plugins\n")
 	for i := 0; i < len(plugins); i += 1 {
@@ -75,6 +77,7 @@ load_all_plugins :: proc(plugins: []Plugin) {
 	}
 }
 
+// Load a single plugin and extract relevant symbols out of a shared library in form of odin functions
 load_plugin :: proc(plugin: ^Plugin) {
 	builder := strings.Builder{}
 	_, builder_err := strings.builder_init(&builder)

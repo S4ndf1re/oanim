@@ -16,6 +16,7 @@ State :: struct {
 	rect:           shapes.Rectangle,
 	circle:         shapes.Circle,
 	t:              f32,
+	grid:           util.Grid,
 }
 
 state: ^State
@@ -25,7 +26,7 @@ create_task :: proc(task: ^tasks.TaskSystem) {
 
 	fmt.println("Initilizing system")
 	tasks.init_system(task)
-    task.trigger_callback_after_done = true
+	task.trigger_callback_after_done = true
 	state.task.loop = true
 
 	frames := lib.Keyframes{}
@@ -124,8 +125,9 @@ plugin_update :: proc(dt: f32) {
 
 @(export)
 plugin_render :: proc() {
-	tasks.update_system(&state.task)
+	util.render_grid(&state.grid)
 
+	tasks.update_system(&state.task)
 }
 
 @(export)
@@ -152,4 +154,9 @@ plugin_hot_reload :: proc(memory: rawptr) {
 	create_task(&state.task)
 	create_segment(&state.control_points)
 	create_basic_shapes(&state.rect, &state.circle)
+
+	state.grid.color = rl.WHITE
+	state.grid.count = {100, 100, 100}
+	state.grid.spacing = {10, 10, 10}
+	state.grid.length = {1000, 1000, 1000}
 }

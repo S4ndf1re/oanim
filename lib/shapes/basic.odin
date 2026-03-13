@@ -25,9 +25,11 @@ destroy_segment :: proc(seg: ^Segment) {
 // Each segment is mapped to a part of the input parameter t for the basic shape.
 // For example: if the basic shape has 4 segments, each segment is mapped to 1/4 of the total parameter space (normally 0->1)
 BasicShape :: struct {
-	segments:   []Segment,
-	color:      rl.Color,
-	fill_color: rl.Color,
+	segments:           []Segment,
+	color:              rl.Color,
+	fill_color:         rl.Color,
+	_self:              rawptr,
+	_additional_delete: proc(_: rawptr),
 }
 
 
@@ -40,5 +42,9 @@ destroy_basic_shape :: proc(shape: ^BasicShape) {
 
 	if shape.segments != nil {
 		delete(shape.segments)
+	}
+
+	if shape._additional_delete != nil {
+		shape._additional_delete(shape._self)
 	}
 }
