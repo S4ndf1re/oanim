@@ -19,7 +19,7 @@ TriangulationFailureReason :: union {
 @(private)
 TreeKey :: struct {
 	edge:      ^HeEdge,
-	current_y: ^f32,
+	current_y: ^f64,
 }
 
 @(private)
@@ -37,7 +37,7 @@ tree_cmp_fn :: proc(a, b: TreeKey) -> avl.Ordering {
 }
 
 @(private)
-edge_get_x_for_y :: proc(edge: ^HeEdge, y: f32) -> f32 {
+edge_get_x_for_y :: proc(edge: ^HeEdge, y: f64) -> f64 {
 	// e.y := a.y * (1-t) + b.y * t
 	// e.y := t * -a.y + a.y + b.y * t
 	// e.y := a.y + t * (b.y - a.y)
@@ -81,7 +81,7 @@ is_inner_right :: proc(prev, node: ^HeNode) -> bool {
 }
 
 @(private)
-inner_angle_between :: proc(u, v, w: Vector2) -> f32 {
+inner_angle_between :: proc(u, v, w: Vector2) -> f64 {
 	angle := angle_between(u, v, w)
 
 	if is_right_turn(u, v, w) {
@@ -96,7 +96,7 @@ inner_angle_between :: proc(u, v, w: Vector2) -> f32 {
 find_left_of :: proc(
 	tree: ^avl.Tree(TreeKey),
 	target: ^HeNode,
-	current_y: f32,
+	current_y: f64,
 ) -> (
 	^HeEdge,
 	bool,
@@ -126,7 +126,7 @@ find_left_of :: proc(
 
 // Test if the polygon is in CW or CCW order
 is_clockwise :: proc(poly: Polygon) -> bool {
-	sum: f32 = 0.0
+	sum: f64 = 0.0
 
 	poly_len := len(poly)
 	for i in 0 ..< poly_len {
@@ -152,8 +152,8 @@ ensure_cw :: proc(poly: Polygon) {
 // and `point to point` distance (dist_to_point threshold)
 compress_polygon :: proc(
 	polygon: Polygon,
-	dist_from_line: f32 = 0.001,
-	dist_to_point: f32 = 0.001,
+	dist_from_line: f64 = 0.001,
+	dist_to_point: f64 = 0.001,
 ) -> Polygon {
 	if len(polygon) < 3 {
 		return slice.clone(polygon)
@@ -286,7 +286,7 @@ triangulate :: proc(
 	tree := avl.Tree(TreeKey){}
 	avl.init(&tree, tree_cmp_fn)
 	defer avl.destroy(&tree)
-	current_y: f32 = 0.0
+	current_y: f64 = 0.0
 
 	for e in edges {
 		vi := e.origin

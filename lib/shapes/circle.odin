@@ -6,11 +6,11 @@ import rl "vendor:raylib"
 
 Circle :: struct {
 	using shape: BasicShape,
-	r:           f32,
+	r:           f64,
 }
 
 
-new_basic_circle :: proc(r: f32, color := rl.RED, fill_color := rl.RED) -> Circle {
+new_basic_circle :: proc(r: f64, color := rl.RED, fill_color := rl.RED) -> Circle {
 	circle := Circle{}
 	circle.r = r
 	circle.color = color
@@ -22,9 +22,9 @@ new_basic_circle :: proc(r: f32, color := rl.RED, fill_color := rl.RED) -> Circl
 	// Define 4 quater circles and piece them together
 
 	// NOTE: muliply with r, to go from unit circle to circle with radius r
-	a := 1.00005507808 * r
-	b := 0.55342925736 * r
-	c := 0.99873327689 * r
+	a: f64 = 1.00005507808 * r
+	b: f64 = 0.55342925736 * r
+	c: f64 = 0.99873327689 * r
 
 	rotate := proc(v: Vector2) -> Vector2 {
 		return {v.y, -v.x}

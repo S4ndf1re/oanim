@@ -3,14 +3,14 @@ package polygons
 import "core:math"
 import "core:math/linalg"
 
-Vector2 :: [2]f32
+Vector2 :: [2]f64
 
 // CW Polygon
 Polygon :: []Vector2
 
 
 // implement the cosine of the dot product for a and b
-cosine :: proc(a, b: Vector2) -> f32 {
+cosine :: proc(a, b: Vector2) -> f64 {
 	return linalg.dot(a, b) / (linalg.length(a) * linalg.length(b))
 }
 
@@ -22,7 +22,7 @@ normal :: proc(v: Vector2) -> Vector2 {
 }
 
 // Compute the distance from the line between p and q to test
-distance_from_line :: proc(p, test, q: Vector2) -> f32 {
+distance_from_line :: proc(p, test, q: Vector2) -> f64 {
 	t := point_on_line_t(p, q, test)
 	t_min_dist := math.clamp(t, 0.0, 1.0)
 	p_min_dist := p * (1.0 - t_min_dist) + q * t_min_dist
@@ -52,7 +52,7 @@ is_right_turn :: proc(p, test, q: Vector2) -> bool {
 // Find the parameter `t` in `f(t) := a * (1.0-t) + b * t`,
 // where `a = line_start` and `b = line_end`
 // So that f(t) is the closest point on the line line_start->line_end to `point`
-point_on_line_t :: proc(line_start, line_end, point: Vector2) -> f32 {
+point_on_line_t :: proc(line_start, line_end, point: Vector2) -> f64 {
 	sp := point - line_start
 	se := line_end - line_start
 
@@ -66,7 +66,7 @@ point_on_line_t :: proc(line_start, line_end, point: Vector2) -> f32 {
 }
 
 // Compute the angle between `u`, `v` and `w`
-angle_between :: proc(u, v, w: Vector2) -> f32 {
+angle_between :: proc(u, v, w: Vector2) -> f64 {
 	diff1 := u - v
 	diff2 := w - v
 

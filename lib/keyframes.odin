@@ -4,9 +4,9 @@ package lib
 // The parameter starts at `start` and ends at `end`. The transition takes `duration` seconds.
 // The transition from start to end can be eased using the ease_fn
 Keyframe :: struct {
-	start:    f32,
-	end:      f32,
-	duration: f32,
+	start:    f64,
+	end:      f64,
+	duration: f64,
 	ease_fn:  EaseFunction,
 }
 
@@ -15,7 +15,7 @@ Keyframe :: struct {
 Keyframes :: struct {
 	current: int,
 	keys:    [dynamic]Keyframe,
-	time:    f32,
+	time:    f64,
 	loop:    bool,
 }
 
@@ -51,13 +51,13 @@ keyframes_reached_end :: proc(k: ^Keyframes) -> bool {
 	return k.current >= len(k.keys)
 }
 
-advance :: proc(dt: f32, keyframes: ..^Keyframes) {
+advance :: proc(dt: f64, keyframes: ..^Keyframes) {
 	for key in keyframes {
 		advance_single(dt, key)
 	}
 }
 
-advance_single :: proc(dt: f32, key: ^Keyframes) -> bool {
+advance_single :: proc(dt: f64, key: ^Keyframes) -> bool {
 	key.time += dt
 
 	if key.loop && keyframes_reached_end(key) {
@@ -74,7 +74,7 @@ advance_single :: proc(dt: f32, key: ^Keyframes) -> bool {
 	return !key.loop && keyframes_reached_end(key)
 }
 
-get_value :: proc(k: ^Keyframes) -> f32 {
+get_value :: proc(k: ^Keyframes) -> f64 {
 	if keyframes_reached_end(k) {
 		return k.keys[len(k.keys) - 1].end
 	}
@@ -88,7 +88,7 @@ get_value :: proc(k: ^Keyframes) -> f32 {
 	return lerp(current_key.start, current_key.end, t)
 }
 
-lerp :: proc(start, end, t: f32) -> f32 {
+lerp :: proc(start, end, t: f64) -> f64 {
 	diff := end - start
 
 	return t * diff + start

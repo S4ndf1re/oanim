@@ -2,7 +2,7 @@ package shapes
 
 import rl "vendor:raylib"
 
-Vector2 :: [2]f32
+Vector2 :: [2]f64
 Segment :: struct {
 	thickness: f32,
 	points:    []Vector2,

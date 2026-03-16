@@ -6,12 +6,12 @@ import rl "vendor:raylib"
 // A simple rectangle as a basic shape
 Rectangle :: struct {
 	using shape: BasicShape,
-	w, h:        f32,
+	w, h:        f64,
 }
 
 // Create a new rectangle centered aroudn the origin with width `w` and height `h`
 new_basic_rect :: proc(
-	w, h: f32,
+	w, h: f64,
 	color: rl.Color = rl.RED,
 	fill_color: rl.Color = rl.RED,
 ) -> Rectangle {

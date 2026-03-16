@@ -3,7 +3,7 @@ package lib
 import "shapes"
 
 // compute decasteljau bezier point using control `points` and a parameter `t`
-decas :: proc(segment: shapes.Segment, t: f32) -> shapes.Vector2 {
+decas :: proc(segment: shapes.Segment, t: f64) -> shapes.Vector2 {
 	assert(len(segment.points) >= 1)
 	n := len(segment.points)
 

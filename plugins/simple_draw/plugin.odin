@@ -15,8 +15,7 @@ State :: struct {
 	control_points: shapes.Segment,
 	rect:           shapes.Rectangle,
 	circle:         shapes.Circle,
-	t:              f32,
-	grid:           util.Grid,
+	t:              f64,
 }
 
 state: ^State
@@ -43,7 +42,7 @@ create_task :: proc(task: ^tasks.TaskSystem) {
 		&frames,
 		lib.Keyframe{start = 0.0, end = 0.5, duration = 1.0, ease_fn = lib.sinus_ease},
 	)
-	tasks.add_task(task, tasks.new_keyframe_task(frames, state, proc(ptr: rawptr, t: f32) {
+	tasks.add_task(task, tasks.new_keyframe_task(frames, state, proc(ptr: rawptr, t: f64) {
 			state := cast(^State)ptr
 			fill_color := rl.RED
 			fill_color.w = 50
@@ -69,22 +68,22 @@ create_task :: proc(task: ^tasks.TaskSystem) {
 		&frames,
 		lib.Keyframe{start = 1.0, end = 0.0, duration = 1.0, ease_fn = lib.sinus_ease},
 	)
-	tasks.add_task(task, tasks.new_keyframe_task(frames, state, proc(ptr: rawptr, t: f32) {
+	tasks.add_task(task, tasks.new_keyframe_task(frames, state, proc(ptr: rawptr, t: f64) {
 			state := cast(^State)ptr
 			window_w := rl.GetScreenWidth()
 			window_h := rl.GetScreenHeight()
 			lib.fill_shape(
 				&state.rect,
 				t,
-				translation = shapes.Vector2{(f32)(window_w) * t, (f32)(window_h) / 2.0},
-				rotationAngle = 90.0 * t,
+				translation = shapes.Vector2{(f64)(window_w) * t, (f64)(window_h) / 2.0},
+				rotationAngle = 90.0 * cast(f32)t,
 			)
 		}))
 	tasks.add_task(task, tasks.new_wait_task(1.0))
 }
 
 
-set_current_t_callback: tasks.KeyframeTaskCallback : proc(ptr: rawptr, value: f32) {
+set_current_t_callback: tasks.KeyframeTaskCallback : proc(ptr: rawptr, value: f64) {
 	state := (^State)(ptr)
 
 	state.t = value
@@ -125,8 +124,6 @@ plugin_update :: proc(dt: f32) {
 
 @(export)
 plugin_render :: proc() {
-	util.render_grid(&state.grid)
-
 	tasks.update_system(&state.task)
 }
 
@@ -154,9 +151,4 @@ plugin_hot_reload :: proc(memory: rawptr) {
 	create_task(&state.task)
 	create_segment(&state.control_points)
 	create_basic_shapes(&state.rect, &state.circle)
-
-	state.grid.color = rl.WHITE
-	state.grid.count = {100, 100, 100}
-	state.grid.spacing = {10, 10, 10}
-	state.grid.length = {1000, 1000, 1000}
 }

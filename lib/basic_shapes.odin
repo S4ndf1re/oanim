@@ -8,16 +8,16 @@ import rl "vendor:raylib"
 // Split the parameter `t` to the segments into `ts`.
 // Each segment timestamp `ts` is a mapping from 1/n to 0->1
 @(private)
-split_t_into_ts :: proc(shape: ^shapes.BasicShape, t: f32, ts: []f32) -> bool {
+split_t_into_ts :: proc(shape: ^shapes.BasicShape, t: f64, ts: []f64) -> bool {
 	if len(shape.segments) != len(ts) {
 		return false
 	}
 
 
-	denominator := (1.0 / (f32)(len(ts)))
+	denominator := (1.0 / (f64)(len(ts)))
 
 	complete_segments := (int)(t / denominator)
-	leftover := t - (f32)(complete_segments) * denominator
+	leftover := t - (f64)(complete_segments) * denominator
 
 	for i in 0 ..< complete_segments {
 		ts[i] = 1.0
@@ -39,12 +39,12 @@ split_t_into_ts :: proc(shape: ^shapes.BasicShape, t: f32, ts: []f32) -> bool {
 // Draw a shape using the draw curve by identifying the current parameterspace `ts`
 draw_shape_until :: proc(
 	shape: ^shapes.BasicShape,
-	t: f32,
+	t: f64,
 	translation: shapes.Vector2 = {0.0, 0.0},
 	rotationAngle: f32 = 0.0,
 	scale: f32 = 1.0,
 ) {
-	ts := make([]f32, len(shape.segments))
+	ts := make([]f64, len(shape.segments))
 	split_t_into_ts(shape, t, ts)
 
 	zipped := soa_zip(t = ts, shape = shape.segments)
@@ -90,12 +90,12 @@ draw_shape :: proc {
 // Fill a shape. Identify the same paramters as draw_shape_until
 fill_shape_until :: proc(
 	shape: ^shapes.BasicShape,
-	t: f32,
+	t: f64,
 	translation: shapes.Vector2 = {0.0, 0.0},
 	rotationAngle: f32 = 0.0,
 	scale: f32 = 1.0,
 ) {
-	ts := make([]f32, len(shape.segments))
+	ts := make([]f64, len(shape.segments))
 	split_t_into_ts(shape, t, ts)
 
 	fill_curves(
@@ -117,7 +117,7 @@ fill_shape_all :: proc(
 	rotationAngle: f32 = 0.0,
 	scale: f32 = 1.0,
 ) {
-	ts := make([]f32, len(shape.segments))
+	ts := make([]f64, len(shape.segments))
 	slice.fill(ts, 1.0)
 
 	fill_curves(

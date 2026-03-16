@@ -51,7 +51,7 @@ restart_wait :: proc(ptr: rawptr) {
 }
 
 
-KeyframeTaskCallback :: #type proc(state: rawptr, keyframe_value: f32)
+KeyframeTaskCallback :: #type proc(state: rawptr, keyframe_value: f64)
 
 KeyframeTaskState :: struct {
 	state:     rawptr,
@@ -86,7 +86,7 @@ advance_keyframes :: proc(ptr: rawptr) -> bool {
 	}
 
 	elapsed := time.stopwatch_duration(keyframe_state.stopwatch)
-	done := lib.advance_single((f32)(time.duration_seconds(elapsed)), &keyframe_state.frames)
+	done := lib.advance_single(time.duration_seconds(elapsed), &keyframe_state.frames)
 
 	if keyframe_state.callback != nil {
 		keyframe_state.callback(keyframe_state.state, lib.get_value(&keyframe_state.frames))
